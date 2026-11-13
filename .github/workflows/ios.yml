@@ -20,11 +20,27 @@ jobs:
           repository: "RSDKModding/Sonic-Mania-Decompilation"
           path: "Sonic-Mania-Decompilation"
 
-      - name: Setup Game symlink & Info.plist
+      - name: Patch Mod Path to Documents & Setup Files
         run: |
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
+          
+          # RSDKv5 소스코드 내의 mods 경로를 Documents/mods (유저 파일 앱 경로)로 패치
+          grep -rl '"mods/' RSDKv5/ | xargs sed -i '' 's|"mods/|"%s/mods/|g' || true
+          find RSDKv5 -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | xargs sed -i '' 's|Data/mods|mods|g' || true
+          python3 -c '
+          import glob
+          for f in glob.glob("RSDKv5/**/*.cpp", recursive=True) + glob.glob("RSDKv5/**/*.mm", recursive=True):
+              with open(f, "r", encoding="utf-8", errors="ignore") as fp:
+                  s = fp.read()
+              if "modconfig.ini" in s:
+                  s = s.replace("\"mods/", "userFilePath + \"mods/")
+                  s = s.replace("sprintf(buffer, \"mods/", "sprintf(buffer, \"%smods/\", userFilePath.c_str(), \"")
+                  with open(f, "w", encoding="utf-8") as fp:
+                      fp.write(s)
+          '
+
           cat << 'EOF' > RSDKv5/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
@@ -52,8 +68,6 @@ jobs:
             <true/>
             <key>LSSupportsOpeningDocumentsInPlace</key>
             <true/>
-            <key>UILaunchStoryboardName</key>
-            <string>LaunchScreen</string>
             <key>UIRequiredDeviceCapabilities</key>
             <array>
               <string>arm64</string>
@@ -67,10 +81,10 @@ jobs:
           </plist>
           EOF
 
-      - name: Build iOS App
+      - name: Build All iOS Targets (Engine + SonicMania Logic)
         run: |
           xcodebuild -project RSDKv5.xcodeproj \
-            -scheme RSDKv5 \
+            -alltargets \
             -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
@@ -81,10 +95,12 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CONFIGURATION_BUILD_DIR="$PWD/build_out"
 
-      - name: Package IPA
+      - name: Package IPA with SonicMania Framework
         run: |
           mkdir -p Payload
-          cp -r build_out/*.app Payload/
+          cp -r build_out/RSDKv5.app Payload/
+          mkdir -p Payload/RSDKv5.app/Frameworks
+          cp -r build_out/*.framework Payload/RSDKv5.app/Frameworks/ 2>/dev/null || true
           zip -r RSDKv5-iOS.ipa Payload
 
       - name: Upload IPA Artifact
