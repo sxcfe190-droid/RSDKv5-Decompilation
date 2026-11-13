@@ -24,8 +24,6 @@ jobs:
         run: |
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
-          rm -rf Sonic-Mania-Decompilation/dependencies/RSDKv5
-          ln -s "$PWD" Sonic-Mania-Decompilation/dependencies/RSDKv5
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
           
           python3 -c '
@@ -95,14 +93,16 @@ jobs:
 
       - name: Build SonicMania dylib for iOS
         run: |
-          cmake -S Sonic-Mania-Decompilation -B build_mania \
-            -DCMAKE_SYSTEM_NAME=iOS \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DRETRO_MOD_LOADER=ON \
-            -DRETRO_REVISION=2
-          cmake --build build_mania --config Release
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          mkdir -p build_mania
+          find Sonic-Mania-Decompilation/SonicMania -name "*.cpp" -o -name "*.c" > sources.txt
+          xcrun --sdk iphoneos clang++ -arch arm64 -isysroot "$SDK_PATH" -miphoneos-version-min=13.0 \
+            -std=c++17 -O2 -shared -fPIC -undefined dynamic_lookup \
+            -DRETRO_MOD_LOADER=1 -DRETRO_REVISION=2 -DMANIA_USE_PLUS=1 \
+            -I"$PWD/RSDKv5" \
+            -I"$PWD/Sonic-Mania-Decompilation/SonicMania" \
+            @sources.txt \
+            -o build_mania/SonicMania
 
       - name: Package IPA with SonicMania
         run: |
@@ -110,10 +110,7 @@ jobs:
           cp -r build_out/RSDKv5.app Payload/
           mkdir -p Payload/RSDKv5.app/Frameworks
           find build_out -name "*.framework" -exec cp -r {} Payload/RSDKv5.app/Frameworks/ \;
-          MANIA_BIN=$(find build_mania -name "*SonicMania*" -type f | head -n 1)
-          if [ -n "$MANIA_BIN" ]; then
-            cp "$MANIA_BIN" Payload/RSDKv5.app/Frameworks/SonicMania
-          fi
+          cp build_mania/SonicMania Payload/RSDKv5.app/Frameworks/SonicMania
           ls -la Payload/RSDKv5.app/Frameworks/
           zip -r RSDKv5-iOS.ipa Payload
 
