@@ -25,7 +25,6 @@ jobs:
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
-          sed -i '' 's/color \*colorTable;/::color \*colorTable;/g' Sonic-Mania-Decompilation/SonicMania/Objects/SSZ/SSZSpotlight.h
           
           python3 -c '
           p = "RSDKv5/RSDK/Core/ModAPI.cpp"
@@ -78,7 +77,7 @@ jobs:
           </plist>
           EOF
 
-      - name: Build RSDKv5 Engine
+      - name: Build RSDKv5 Engine & SonicMania
         run: |
           xcodebuild -project RSDKv5.xcodeproj \
             -scheme RSDKv5 \
@@ -92,27 +91,17 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CONFIGURATION_BUILD_DIR="$PWD/build_out"
 
-      - name: Build SonicMania dylib for iOS
-        run: |
-          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-          mkdir -p build_mania
-          find Sonic-Mania-Decompilation/SonicMania -name "*.cpp" -o -name "*.c" > sources.txt
-          xcrun --sdk iphoneos clang++ -arch arm64 -isysroot "$SDK_PATH" -miphoneos-version-min=13.0 \
-            -std=c++17 -O2 -shared -fPIC -undefined dynamic_lookup \
-            -DRETRO_MOD_LOADER=1 -DRETRO_REVISION=2 -DGAME_VERSION=106 \
-            -I"$PWD/RSDKv5" \
-            -I"$PWD/Sonic-Mania-Decompilation/SonicMania" \
-            -I"$PWD/Sonic-Mania-Decompilation/SonicMania/Objects" \
-            @sources.txt \
-            -o build_mania/SonicMania
-
       - name: Package IPA with SonicMania
         run: |
           mkdir -p Payload
           cp -r build_out/RSDKv5.app Payload/
           mkdir -p Payload/RSDKv5.app/Frameworks
-          find build_out -name "*.framework" -exec cp -r {} Payload/RSDKv5.app/Frameworks/ \;
-          cp build_mania/SonicMania Payload/RSDKv5.app/Frameworks/SonicMania
+          find build_out -maxdepth 2 -name "*.framework" -exec cp -r {} Payload/RSDKv5.app/Frameworks/ \;
+          if [ -f build_out/SonicMania ]; then
+            cp build_out/SonicMania Payload/RSDKv5.app/Frameworks/SonicMania
+          elif [ -f build_out/libSonicMania.dylib ]; then
+            cp build_out/libSonicMania.dylib Payload/RSDKv5.app/Frameworks/SonicMania
+          fi
           ls -la Payload/RSDKv5.app/Frameworks/
           zip -r RSDKv5-iOS.ipa Payload
 
