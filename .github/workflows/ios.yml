@@ -25,6 +25,7 @@ jobs:
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
+          sed -i '' 's/color \*colorTable;/::color \*colorTable;/g' Sonic-Mania-Decompilation/SonicMania/Objects/SSZ/SSZSpotlight.h
           
           python3 -c '
           p = "RSDKv5/RSDK/Core/ModAPI.cpp"
