@@ -51,7 +51,7 @@ jobs:
                       f.write(s)
           '
 
-          # 3. 기본 키보드 매핑 초기값만 0x0으로 설정 (switch문 건드리지 않음)
+          # 3. 기본 키보드 매핑 초기값만 0x0으로 설정
           python3 -c '
           import glob, re
           for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True):
@@ -70,7 +70,7 @@ jobs:
               with open(p, "r", encoding="utf-8", errors="ignore") as f:
                   s = f.read()
               if "SDL_InitSubSystem" in s:
-                  hints = "SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, \"0\"); SDL_SetHint(SDL_HINT_IPHONE_KEYBOARD_DISABLES_HOME_BUTTON, \"1\"); "
+                  hints = "SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, \"0\"); "
                   s = s.replace("SDL_InitSubSystem(", hints + "SDL_InitSubSystem(")
                   with open(p, "w", encoding="utf-8") as f:
                       f.write(s)
