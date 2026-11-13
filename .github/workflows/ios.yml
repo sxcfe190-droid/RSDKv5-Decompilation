@@ -26,15 +26,20 @@ jobs:
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
           
+          # RSDKv5 전체에서 BASE_PATH를 사용하는 모드 경로를 userFilePath로 교체
+          grep -rn "BASE_PATH" RSDKv5/RSDK/ || true
           python3 -c '
-          p = "RSDKv5/RSDK/Core/ModAPI.cpp"
-          with open(p, "r") as f:
-              s = f.read()
-          target = "void Mod::InitMods()"
-          if target in s:
-              s = s.replace(target + "\n{", target + "\n{\n    modPath = fs::path(userFilePath) / \"mods\";\n    fs::create_directories(modPath);")
-          with open(p, "w") as f:
-              f.write(s)
+          import glob
+          for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True):
+              with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                  s = f.read()
+              if "modconfig.ini" in s or "ModAPI" in p:
+                  s = s.replace("BASE_PATH \"Data/mods\"", "userFilePath + \"mods\"")
+                  s = s.replace("BASE_PATH \"mods\"", "userFilePath + \"mods\"")
+                  s = s.replace("sprintf(buffer, \"%sData/mods", "sprintf(buffer, \"%smods")
+                  s = s.replace("BASE_PATH", "userFilePath.c_str()")
+                  with open(p, "w", encoding="utf-8") as f:
+                      f.write(s)
           '
 
           cat << 'EOF' > RSDKv5/Info.plist
@@ -77,7 +82,7 @@ jobs:
           </plist>
           EOF
 
-      - name: Build RSDKv5 Engine & SonicMania
+      - name: Build RSDKv5 Engine (Revision 3)
         run: |
           xcodebuild -project RSDKv5.xcodeproj \
             -scheme RSDKv5 \
@@ -85,24 +90,18 @@ jobs:
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=2' \
+            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=3' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             CONFIGURATION_BUILD_DIR="$PWD/build_out"
 
-      - name: Package IPA with SonicMania
+      - name: Package IPA
         run: |
           mkdir -p Payload
           cp -r build_out/RSDKv5.app Payload/
           mkdir -p Payload/RSDKv5.app/Frameworks
           find build_out -maxdepth 2 -name "*.framework" -exec cp -r {} Payload/RSDKv5.app/Frameworks/ \;
-          if [ -f build_out/SonicMania ]; then
-            cp build_out/SonicMania Payload/RSDKv5.app/Frameworks/SonicMania
-          elif [ -f build_out/libSonicMania.dylib ]; then
-            cp build_out/libSonicMania.dylib Payload/RSDKv5.app/Frameworks/SonicMania
-          fi
-          ls -la Payload/RSDKv5.app/Frameworks/
           zip -r RSDKv5-iOS.ipa Payload
 
       - name: Upload IPA Artifact
