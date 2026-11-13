@@ -1,0 +1,29 @@
+name: Build RSDKv5 iOS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build iOS Xcode Project
+        run: |
+          xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 -configuration Release -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR="$PWD/build_out"
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r build_out/*.app Payload/
+          zip -r RSDKv5-iOS.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RSDKv5-iOS-IPA
+          path: RSDKv5-iOS.ipa
