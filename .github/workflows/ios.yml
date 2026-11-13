@@ -25,18 +25,9 @@ jobs:
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
 
-      - name: Build SDL2 for iOS first
+      - name: Fix SDL Target Ambiguity
         run: |
-          xcodebuild -project dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj \
-            -target Framework-iOS \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination "generic/platform=iOS" \
-            IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CONFIGURATION_BUILD_DIR="$PWD/build_out"
+          sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
 
       - name: Build iOS App
         run: |
@@ -47,7 +38,6 @@ jobs:
             -destination "generic/platform=iOS" \
             IPHONEOS_DEPLOYMENT_TARGET=13.0 \
             GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=2' \
-            FRAMEWORK_SEARCH_PATHS='$(inherited) $(CONFIGURATION_BUILD_DIR)' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
