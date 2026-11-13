@@ -12,14 +12,25 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build iOS Xcode Project
+      - name: Configure CMake for iOS
         run: |
-          xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 -configuration Release -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR="$PWD/build_out"
+          cmake -B build_ios -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DRETRO_MOD_LOADER=ON \
+            -DRETRO_USE_ORIGINAL_CODE=OFF
+
+      - name: Build iOS App
+        run: |
+          cmake --build build_ios --config Release -- \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Package IPA
         run: |
           mkdir -p Payload
-          cp -r build_out/*.app Payload/
+          find build_ios -name "*.app" -exec cp -r {} Payload/ \;
           zip -r RSDKv5-iOS.ipa Payload
 
       - name: Upload IPA Artifact
