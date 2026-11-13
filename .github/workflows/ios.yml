@@ -26,24 +26,20 @@ jobs:
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
           
-          # ModAPI.cpp에서 modPath를 아이패드 파일 앱 경로(userFilePath + "mods")로 변경
+          # ModAPI.cpp 내의 실제 InitMods 부분 확인 및 userFilePath 강제 적용
+          grep -n -C 5 "InitMods" RSDKv5/RSDK/Core/ModAPI.cpp || true
           python3 -c '
           p = "RSDKv5/RSDK/Core/ModAPI.cpp"
           with open(p, "r") as f:
-              lines = f.readlines()
-          new_lines = []
-          for line in lines:
-              new_lines.append(line)
-              if "mod_config" in line and "modPath.string()" in line:
-                  pass
-          code = "".join(lines)
-          code = code.replace("modPath = fs::path(BASE_PATH)", "modPath = fs::path(userFilePath)")
-          code = code.replace("modPath = BASE_PATH", "modPath = userFilePath")
-          code = code.replace("Data/mods", "mods")
+              s = f.read()
+          # modPath가 어디서 초기화되든 InitMods 시작 직후에 userFilePath + "mods"로 덮어쓰기
+          target = "void Mod::InitMods()"
+          if target in s:
+              s = s.replace(target, target + "\n{\n    modPath = fs::path(userFilePath) / \"mods\";\n    fs::create_directories(modPath);\n" if target + "\n{" not in s else target)
+              s = s.replace(target + "\n{", target + "\n{\n    modPath = fs::path(userFilePath) / \"mods\";\n    fs::create_directories(modPath);")
           with open(p, "w") as f:
-              f.write(code)
+              f.write(s)
           '
-          grep -rn "modPath" RSDKv5/RSDK/Core/ModAPI.cpp | head -n 15
 
           cat << 'EOF' > RSDKv5/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -99,42 +95,28 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CONFIGURATION_BUILD_DIR="$PWD/build_out"
 
-      - name: Build SonicMania Game Logic
+      - name: Build SonicMania dylib for iOS
         run: |
-          find . -maxdepth 3 -name "*.xcodeproj" -o -name "*.xcworkspace"
-          MANIA_PROJ=$(find Sonic-Mania-Decompilation -name "*.xcodeproj" | head -n 1)
-          if [ -n "$MANIA_PROJ" ]; then
-            xcodebuild -project "$MANIA_PROJ" \
-              -alltargets \
-              -configuration Release \
-              -sdk iphoneos \
-              -destination "generic/platform=iOS" \
-              IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-              GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=2' \
-              CODE_SIGN_IDENTITY="" \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGNING_ALLOWED=NO \
-              CONFIGURATION_BUILD_DIR="$PWD/build_out"
-          else
-            cmake -S Sonic-Mania-Decompilation -B build_mania -G Xcode \
-              -DCMAKE_SYSTEM_NAME=iOS \
-              -DCMAKE_OSX_ARCHITECTURES=arm64 \
-              -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
-              -DRETRO_MOD_LOADER=ON \
-              -DRETRO_REVISION=2
-            cmake --build build_mania --config Release -- \
-              CODE_SIGN_IDENTITY="" \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGNING_ALLOWED=NO \
-              CONFIGURATION_BUILD_DIR="$PWD/build_out"
-          fi
+          cmake -S Sonic-Mania-Decompilation -B build_mania \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DRETRO_MOD_LOADER=ON \
+            -DRETRO_REVISION=2
+          cmake --build build_mania --config Release
+          find build_mania -type f
 
-      - name: Package IPA with SonicMania Framework
+      - name: Package IPA with SonicMania
         run: |
           mkdir -p Payload
           cp -r build_out/RSDKv5.app Payload/
           mkdir -p Payload/RSDKv5.app/Frameworks
           find build_out -name "*.framework" -exec cp -r {} Payload/RSDKv5.app/Frameworks/ \;
+          MANIA_BIN=$(find build_mania -name "*SonicMania*" -type f | head -n 1)
+          if [ -n "$MANIA_BIN" ]; then
+            cp "$MANIA_BIN" Payload/RSDKv5.app/Frameworks/SonicMania
+          fi
           ls -la Payload/RSDKv5.app/Frameworks/
           zip -r RSDKv5-iOS.ipa Payload
 
