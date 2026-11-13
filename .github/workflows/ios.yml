@@ -98,9 +98,10 @@ jobs:
           find Sonic-Mania-Decompilation/SonicMania -name "*.cpp" -o -name "*.c" > sources.txt
           xcrun --sdk iphoneos clang++ -arch arm64 -isysroot "$SDK_PATH" -miphoneos-version-min=13.0 \
             -std=c++17 -O2 -shared -fPIC -undefined dynamic_lookup \
-            -DRETRO_MOD_LOADER=1 -DRETRO_REVISION=2 -DMANIA_USE_PLUS=1 \
+            -DRETRO_MOD_LOADER=1 -DRETRO_REVISION=2 -DGAME_VERSION=106 \
             -I"$PWD/RSDKv5" \
             -I"$PWD/Sonic-Mania-Decompilation/SonicMania" \
+            -I"$PWD/Sonic-Mania-Decompilation/SonicMania/Objects" \
             @sources.txt \
             -o build_mania/SonicMania
 
