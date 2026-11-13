@@ -7,9 +7,11 @@ jobs:
   build-ios:
     runs-on: macos-latest
     steps:
-      - name: Checkout RSDKv5
+      - name: Checkout WamWooWam iOS Fork
         uses: actions/checkout@v4
         with:
+          repository: "WamWooWam/RSDKv5-Decompilation"
+          ref: "ios"
           submodules: recursive
 
       - name: Checkout Sonic Mania
