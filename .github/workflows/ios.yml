@@ -15,12 +15,11 @@ jobs:
       - name: Configure CMake for iOS
         run: |
           cmake -B build_ios -G Xcode \
-            -DCMAKE_TOOLCHAIN_FILE=platforms/iOS.cmake \
-            -DCMAKE_SYSTEM_NAME=iOS \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_TOOLCHAIN_FILE="$PWD/RSDKv5/platforms/iOS.cmake" \
+            -DPLATFORM=iOS \
+            -DRETRO_BACKEND=SDL2 \
             -DRETRO_MOD_LOADER=ON \
-            -DRETRO_USE_ORIGINAL_CODE=OFF \
-            -DRETRO_USE_BUNDLED_SDL2=ON
+            -DRETRO_USE_ORIGINAL_CODE=OFF
 
       - name: Build iOS App
         run: |
