@@ -51,13 +51,13 @@ jobs:
                       f.write(s)
           '
 
-          # 3. 기본 키보드 매핑(SDL_SCANCODE_*)을 0x0으로 비활성화하여 패드 버튼과 충돌 차단
+          # 3. 기본 키보드 매핑 초기값만 0x0으로 설정 (switch문 건드리지 않음)
           python3 -c '
           import glob, re
           for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True):
               with open(p, "r", encoding="utf-8", errors="ignore") as f:
                   s = f.read()
-              if "SDL_SCANCODE_" in s and ("up =" in s or "buttonA =" in s or "keyMap" in s or "Keyboard" in s):
+              if "SDL_SCANCODE_" in s and "case SDL_SCANCODE_" not in s:
                   s = re.sub(r"\bSDL_SCANCODE_[A-Z0-9_]+\b", "0x0", s)
                   with open(p, "w", encoding="utf-8") as f:
                       f.write(s)
