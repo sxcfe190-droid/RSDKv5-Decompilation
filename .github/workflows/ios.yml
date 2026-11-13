@@ -20,28 +20,77 @@ jobs:
           repository: "RSDKModding/Sonic-Mania-Decompilation"
           path: "Sonic-Mania-Decompilation"
 
-      - name: Patch ModAPI to Documents & Setup Files
+      - name: Patch DevMenu, Controller 1P, Resizable Window & Mod Path
         run: |
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
           
-          # RSDKv5 전체에서 BASE_PATH를 사용하는 모드 경로를 userFilePath로 교체
-          grep -rn "BASE_PATH" RSDKv5/RSDK/ || true
+          # 1. 모드 경로를 아이패드 파일 앱(userFilePath/mods)으로 고정
+          python3 -c '
+          p = "RSDKv5/RSDK/Core/ModAPI.cpp"
+          with open(p, "r") as f:
+              s = f.read()
+          target = "void Mod::InitMods()"
+          if target in s:
+              s = s.replace(target + "\n{", target + "\n{\n    modPath = fs::path(userFilePath) / \"mods\";\n    fs::create_directories(modPath);")
+          with open(p, "w") as f:
+              f.write(s)
+          '
+
+          # 2. Dev Menu 기본값을 항상 활성화(true)로 설정
           python3 -c '
           import glob
           for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True):
               with open(p, "r", encoding="utf-8", errors="ignore") as f:
                   s = f.read()
-              if "modconfig.ini" in s or "ModAPI" in p:
-                  s = s.replace("BASE_PATH \"Data/mods\"", "userFilePath + \"mods\"")
-                  s = s.replace("BASE_PATH \"mods\"", "userFilePath + \"mods\"")
-                  s = s.replace("sprintf(buffer, \"%sData/mods", "sprintf(buffer, \"%smods")
-                  s = s.replace("BASE_PATH", "userFilePath.c_str()")
+              if "devMenu" in s:
+                  s = s.replace("devMenu = false;", "devMenu = true;")
+                  s = s.replace("devMenu = 0;", "devMenu = 1;")
                   with open(p, "w", encoding="utf-8") as f:
                       f.write(s)
           '
 
+          # 3. 기본 키보드 매핑(SDL_SCANCODE_*)을 0x0으로 비활성화하여 패드 버튼과 충돌 차단
+          python3 -c '
+          import glob, re
+          for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True):
+              with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                  s = f.read()
+              if "SDL_SCANCODE_" in s and ("up =" in s or "buttonA =" in s or "keyMap" in s or "Keyboard" in s):
+                  s = re.sub(r"\bSDL_SCANCODE_[A-Z0-9_]+\b", "0x0", s)
+                  with open(p, "w", encoding="utf-8") as f:
+                      f.write(s)
+          '
+
+          # 4. 아이패드 가속도계(기울기 센서)가 1P 조이스틱으로 잡히는 현상 차단 -> 엑박 패드 무조건 1P 고정
+          python3 -c '
+          import glob
+          for p in glob.glob("RSDKv5/RSDK/Input/**/*.cpp", recursive=True) + glob.glob("dependencies/ios/**/*.cpp", recursive=True):
+              with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                  s = f.read()
+              if "SDL_InitSubSystem" in s:
+                  hints = "SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, \"0\"); SDL_SetHint(SDL_HINT_IPHONE_KEYBOARD_DISABLES_HOME_BUTTON, \"1\"); "
+                  s = s.replace("SDL_InitSubSystem(", hints + "SDL_InitSubSystem(")
+                  with open(p, "w", encoding="utf-8") as f:
+                      f.write(s)
+          '
+
+          # 5. 창 크기 자유 조절(SDL_WINDOW_RESIZABLE) 허용 및 전체화면 강제 고정 해제
+          python3 -c '
+          import glob
+          for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True):
+              with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                  s = f.read()
+              if "SDL_CreateWindow(" in s:
+                  s = s.replace("SDL_WINDOW_FULLSCREEN_DESKTOP", "SDL_WINDOW_RESIZABLE")
+                  s = s.replace("SDL_WINDOW_FULLSCREEN", "SDL_WINDOW_RESIZABLE")
+                  s = s.replace("SDL_WINDOW_SHOWN", "SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE")
+                  with open(p, "w", encoding="utf-8") as f:
+                      f.write(s)
+          '
+
+          # 6. 컨트롤러 프로파일 + 파일 앱 공유 권한 + 스테이지 매니저/창 크기 자유 조절 Info.plist
           cat << 'EOF' > RSDKv5/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
@@ -65,9 +114,20 @@ jobs:
             <string>1</string>
             <key>LSRequiresIPhoneOS</key>
             <true/>
+            <key>UIRequiresFullScreen</key>
+            <false/>
             <key>UIFileSharingEnabled</key>
             <true/>
             <key>LSSupportsOpeningDocumentsInPlace</key>
+            <true/>
+            <key>GCSupportedGameControllers</key>
+            <array>
+              <dict>
+                <key>ProfileName</key>
+                <string>ExtendedGamepad</string>
+              </dict>
+            </array>
+            <key>GCSupportsControllerUserInteraction</key>
             <true/>
             <key>UIRequiredDeviceCapabilities</key>
             <array>
@@ -75,6 +135,15 @@ jobs:
             </array>
             <key>UISupportedInterfaceOrientations</key>
             <array>
+              <string>UIInterfaceOrientationPortrait</string>
+              <string>UIInterfaceOrientationPortraitUpsideDown</string>
+              <string>UIInterfaceOrientationLandscapeLeft</string>
+              <string>UIInterfaceOrientationLandscapeRight</string>
+            </array>
+            <key>UISupportedInterfaceOrientations~ipad</key>
+            <array>
+              <string>UIInterfaceOrientationPortrait</string>
+              <string>UIInterfaceOrientationPortraitUpsideDown</string>
               <string>UIInterfaceOrientationLandscapeLeft</string>
               <string>UIInterfaceOrientationLandscapeRight</string>
             </array>
@@ -102,6 +171,8 @@ jobs:
           cp -r build_out/RSDKv5.app Payload/
           mkdir -p Payload/RSDKv5.app/Frameworks
           find build_out -maxdepth 2 -name "*.framework" -exec cp -r {} Payload/RSDKv5.app/Frameworks/ \;
+          # 가상 터치(1P 슬롯 강탈 원인) 제외
+          rm -rf Payload/RSDKv5.app/Frameworks/ManiaTouchControls.framework
           zip -r RSDKv5-iOS.ipa Payload
 
       - name: Upload IPA Artifact
