@@ -20,27 +20,30 @@ jobs:
           repository: "RSDKModding/Sonic-Mania-Decompilation"
           path: "Sonic-Mania-Decompilation"
 
-      - name: Inspect Mod Path & Setup Files
+      - name: Patch ModAPI to Documents & Setup Files
         run: |
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
           
-          # 정확한 모드 경로 변수 확인용 로그 출력
-          grep -rn "modconfig.ini" RSDKv5/ || true
-          
-          # RSDKv5/RSDK/User/Core/ModAPI.cpp 내에서만 안전하게 userFilePath 적용
+          # ModAPI.cpp에서 modPath를 아이패드 파일 앱 경로(userFilePath + "mods")로 변경
           python3 -c '
-          import os
-          p = "RSDKv5/RSDK/User/Core/ModAPI.cpp"
-          if os.path.exists(p):
-              with open(p, "r") as f:
-                  code = f.read()
-              code = code.replace("\"mods/modconfig.ini\"", "(userFilePath + \"mods/modconfig.ini\").c_str()")
-              code = code.replace("\"mods/%s\"", "(userFilePath + \"mods/%s\").c_str()")
-              with open(p, "w") as f:
-                  f.write(code)
+          p = "RSDKv5/RSDK/Core/ModAPI.cpp"
+          with open(p, "r") as f:
+              lines = f.readlines()
+          new_lines = []
+          for line in lines:
+              new_lines.append(line)
+              if "mod_config" in line and "modPath.string()" in line:
+                  pass
+          code = "".join(lines)
+          code = code.replace("modPath = fs::path(BASE_PATH)", "modPath = fs::path(userFilePath)")
+          code = code.replace("modPath = BASE_PATH", "modPath = userFilePath")
+          code = code.replace("Data/mods", "mods")
+          with open(p, "w") as f:
+              f.write(code)
           '
+          grep -rn "modPath" RSDKv5/RSDK/Core/ModAPI.cpp | head -n 15
 
           cat << 'EOF' > RSDKv5/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
@@ -82,7 +85,7 @@ jobs:
           </plist>
           EOF
 
-      - name: Build RSDKv5 & SonicMania
+      - name: Build RSDKv5 Engine
         run: |
           xcodebuild -project RSDKv5.xcodeproj \
             -scheme RSDKv5 \
@@ -96,24 +99,43 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CONFIGURATION_BUILD_DIR="$PWD/build_out"
 
-          xcodebuild -project RSDKv5.xcodeproj \
-            -target SonicMania \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination "generic/platform=iOS" \
-            IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=2' \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CONFIGURATION_BUILD_DIR="$PWD/build_out"
+      - name: Build SonicMania Game Logic
+        run: |
+          find . -maxdepth 3 -name "*.xcodeproj" -o -name "*.xcworkspace"
+          MANIA_PROJ=$(find Sonic-Mania-Decompilation -name "*.xcodeproj" | head -n 1)
+          if [ -n "$MANIA_PROJ" ]; then
+            xcodebuild -project "$MANIA_PROJ" \
+              -alltargets \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination "generic/platform=iOS" \
+              IPHONEOS_DEPLOYMENT_TARGET=13.0 \
+              GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=2' \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO \
+              CONFIGURATION_BUILD_DIR="$PWD/build_out"
+          else
+            cmake -S Sonic-Mania-Decompilation -B build_mania -G Xcode \
+              -DCMAKE_SYSTEM_NAME=iOS \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
+              -DRETRO_MOD_LOADER=ON \
+              -DRETRO_REVISION=2
+            cmake --build build_mania --config Release -- \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO \
+              CONFIGURATION_BUILD_DIR="$PWD/build_out"
+          fi
 
       - name: Package IPA with SonicMania Framework
         run: |
           mkdir -p Payload
           cp -r build_out/RSDKv5.app Payload/
           mkdir -p Payload/RSDKv5.app/Frameworks
-          cp -r build_out/*.framework Payload/RSDKv5.app/Frameworks/ 2>/dev/null || true
+          find build_out -name "*.framework" -exec cp -r {} Payload/RSDKv5.app/Frameworks/ \;
+          ls -la Payload/RSDKv5.app/Frameworks/
           zip -r RSDKv5-iOS.ipa Payload
 
       - name: Upload IPA Artifact
