@@ -20,25 +20,26 @@ jobs:
           repository: "RSDKModding/Sonic-Mania-Decompilation"
           path: "Sonic-Mania-Decompilation"
 
-      - name: Patch Mod Path to Documents & Setup Files
+      - name: Inspect Mod Path & Setup Files
         run: |
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
           
-          # RSDKv5 소스코드 내의 mods 경로를 Documents/mods (유저 파일 앱 경로)로 패치
-          grep -rl '"mods/' RSDKv5/ | xargs sed -i '' 's|"mods/|"%s/mods/|g' || true
-          find RSDKv5 -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | xargs sed -i '' 's|Data/mods|mods|g' || true
+          # 정확한 모드 경로 변수 확인용 로그 출력
+          grep -rn "modconfig.ini" RSDKv5/ || true
+          
+          # RSDKv5/RSDK/User/Core/ModAPI.cpp 내에서만 안전하게 userFilePath 적용
           python3 -c '
-          import glob
-          for f in glob.glob("RSDKv5/**/*.cpp", recursive=True) + glob.glob("RSDKv5/**/*.mm", recursive=True):
-              with open(f, "r", encoding="utf-8", errors="ignore") as fp:
-                  s = fp.read()
-              if "modconfig.ini" in s:
-                  s = s.replace("\"mods/", "userFilePath + \"mods/")
-                  s = s.replace("sprintf(buffer, \"mods/", "sprintf(buffer, \"%smods/\", userFilePath.c_str(), \"")
-                  with open(f, "w", encoding="utf-8") as fp:
-                      fp.write(s)
+          import os
+          p = "RSDKv5/RSDK/User/Core/ModAPI.cpp"
+          if os.path.exists(p):
+              with open(p, "r") as f:
+                  code = f.read()
+              code = code.replace("\"mods/modconfig.ini\"", "(userFilePath + \"mods/modconfig.ini\").c_str()")
+              code = code.replace("\"mods/%s\"", "(userFilePath + \"mods/%s\").c_str()")
+              with open(p, "w") as f:
+                  f.write(code)
           '
 
           cat << 'EOF' > RSDKv5/Info.plist
@@ -81,10 +82,22 @@ jobs:
           </plist>
           EOF
 
-      - name: Build All iOS Targets (Engine + SonicMania Logic)
+      - name: Build RSDKv5 & SonicMania
         run: |
           xcodebuild -project RSDKv5.xcodeproj \
-            -alltargets \
+            -scheme RSDKv5 \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            IPHONEOS_DEPLOYMENT_TARGET=13.0 \
+            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=2' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CONFIGURATION_BUILD_DIR="$PWD/build_out"
+
+          xcodebuild -project RSDKv5.xcodeproj \
+            -target SonicMania \
             -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
