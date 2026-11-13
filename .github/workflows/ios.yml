@@ -7,19 +7,28 @@ jobs:
   build-ios:
     runs-on: macos-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout RSDKv5
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      - name: Checkout Sonic Mania
+        uses: actions/checkout@v4
+        with:
+          repository: "RSDKModding/Sonic-Mania-Decompilation"
+          path: "Sonic-Mania-Decompilation"
+
+      - name: Setup Game symlink
+        run: |
+          rm -rf Game
+          ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
+
       - name: Configure CMake for iOS
         run: |
           cmake -B build_ios -G Xcode \
-            -DCMAKE_TOOLCHAIN_FILE="$PWD/RSDKv5/platforms/iOS.cmake" \
-            -DPLATFORM=iOS \
-            -DRETRO_BACKEND=SDL2 \
-            -DRETRO_MOD_LOADER=ON \
-            -DRETRO_USE_ORIGINAL_CODE=OFF
+            -DCMAKE_TOOLCHAIN_FILE="$PWD/platforms/iOS.cmake" \
+            -DRETRO_REVISION=2 \
+            -DRETRO_MOD_LOADER=ON
 
       - name: Build iOS App
         run: |
