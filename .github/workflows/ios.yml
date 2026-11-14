@@ -373,7 +373,7 @@ jobs:
               }
           }
           EOF
-                    cat << 'EOF' > SaveEditorMod/dllmain.c
+          cat << 'EOF' > SaveEditorMod/dllmain.c
           #include "GameAPI/Game.h"
           #include "Objects/UISaveSlot.h"
           #include "Objects/UIMedallionPanel.h"
@@ -408,9 +408,9 @@ jobs:
           #endif
           EOF
 
-          GAME_C=$(find . -path "*/GameAPI/C/GameAPI/Game.c" | head -n 1)
-          GAMEAPI_INC=$(dirname "$(dirname "$GAME_C")")
-          echo "Found Game.c at: $GAME_C (Include: $GAMEAPI_INC)"
+          GH="github.com"
+          GAPI_REPO="RSDKModding/RSDKv5-GameAPI"
+          git clone --depth 1 "https://${GH}/${GAPI_REPO}.git" GameAPI_SDK
 
           SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
           mkdir -p build_out/SaveEditor.framework
@@ -419,8 +419,8 @@ jobs:
             -DRETRO_REVISION=3 -DRETRO_USE_MOD_LOADER=1 -DRETRO_MOD_LOADER_VER=2 \
             -DGAME_INCLUDE_EDITOR=1 -DMANIA_PREPLUS=0 -DMANIA_FIRST_RELEASE=0 \
             -DGAME_VERSION=5 -DGAME_TYPE=1 \
-            -ISaveEditorMod -ISaveEditorMod/Objects -I"$GAMEAPI_INC" \
-            "$GAME_C" SaveEditorMod/dllmain.c \
+            -ISaveEditorMod -ISaveEditorMod/Objects -IGameAPI_SDK/C \
+            GameAPI_SDK/C/GameAPI/Game.c SaveEditorMod/dllmain.c \
             SaveEditorMod/Objects/UISaveSlot.c SaveEditorMod/Objects/UIMedallionPanel.c \
             -o build_out/SaveEditor.framework/SaveEditor
 
