@@ -1,4 +1,4 @@
-name: Inspect LoadMod and Debug Mods Toggle
+name: Inspect LoadMod Body
 
 on:
   workflow_dispatch:
@@ -12,9 +12,6 @@ jobs:
           repository: WamWooWam/RSDKv5-Decompilation
           ref: ios
 
-      - name: Print ModAPI.cpp 261-550 and Debug.cpp
+      - name: Print ModAPI.cpp 551-820
         run: |
-          echo "=== ModAPI.cpp 261-550 ==="
-          nl -ba RSDKv5/RSDK/Core/ModAPI.cpp | sed -n '261,550p'
-          echo "=== Debug.cpp Mods Menu ==="
-          grep -rn -C 25 "MANAGE MODS\|LoadMod(" RSDKv5/RSDK/Dev/Debug.cpp
+          nl -ba RSDKv5/RSDK/Core/ModAPI.cpp | sed -n '551,820p'
