@@ -18,14 +18,16 @@ jobs:
         run: |
           rm -rf Game && ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
-          curl -sL "https://githubusercontent.com" -o RSDKv5/RSDK/Audio/stb_vorbis.c
+          STB_SRC=$(find . -name "stb_vorbis.c" | head -n 1)
+          if [ -n "$STB_SRC" ] && [ ! -f "RSDKv5/RSDK/Audio/stb_vorbis.c" ]; then cp "$STB_SRC" RSDKv5/RSDK/Audio/stb_vorbis.c; fi
           cat << 'EOF' > patch.py
-          import glob, re
+          import glob, re, os
+          has_stb = os.path.exists("RSDKv5/RSDK/Audio/stb_vorbis.c")
           for p in glob.glob("RSDKv5/RSDK/**/*.*", recursive=True) + glob.glob("Sonic-Mania-Decompilation/**/*.*", recursive=True) + glob.glob("dependencies/ios/**/*.cpp", recursive=True):
               if not p.endswith((".cpp", ".c", ".h", ".hpp")): continue
               with open(p, "r", encoding="utf-8", errors="ignore") as f: s = f.read()
               o = s
-              if "Audio.cpp" in p and "stb_vorbis.c" not in s: s = '#define STB_VORBIS_NO_PUSHDATA_API\n#include "stb_vorbis.c"\n' + s
+              if has_stb and "Audio.cpp" in p and "stb_vorbis.c" not in s: s = '#define STB_VORBIS_NO_PUSHDATA_API\n#include "stb_vorbis.c"\n' + s
               if "ModAPI" in p or "FileIO" in p:
                   s = s.replace('dataPath + "mods"', '(std::string(userFilePath) + "mods")').replace('dataPath + "/mods"', '(std::string(userFilePath) + "mods")').replace('fs::path(dataPath) / "mods"', 'fs::path(userFilePath) / "mods"')
               if "ModAPI.cpp" in p:
