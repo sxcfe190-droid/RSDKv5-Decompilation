@@ -20,7 +20,7 @@ jobs:
           repository: "RSDKModding/Sonic-Mania-Decompilation"
           path: "Sonic-Mania-Decompilation"
 
-      - name: Patch DevMenu, Controller 1P, Resizable Window & Mod Path
+      - name: Patch DevMenu, Controller 1P, Resizable Window, Mod Path & Plus DLC
         run: |
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
@@ -151,7 +151,22 @@ jobs:
           </plist>
           EOF
 
-      - name: Build RSDKv5 Engine (Revision 3)
+          # 7. 소닉 매니아 플러스(Encore DLC) 기본 활성화 패치
+          python3 -c '
+          import glob, re
+          for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True) + glob.glob("Sonic-Mania-Decompilation/**/*.cpp", recursive=True):
+              with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                  s = f.read()
+              orig = s
+              s = s.replace("dlcEnabled = false;", "dlcEnabled = true;")
+              s = s.replace("dlcEnabled = 0;", "dlcEnabled = 1;")
+              s = re.sub(r"bool32\s+CheckDLC\s*\([^)]*\)\s*\{[^}]*\}", "bool32 CheckDLC(int32 id) { return true; }", s)
+              if s != orig:
+                  with open(p, "w", encoding="utf-8") as f:
+                      f.write(s)
+          '
+
+      - name: Build RSDKv5 Engine (Revision 3 + Plus DLC)
         run: |
           xcodebuild -project RSDKv5.xcodeproj \
             -scheme RSDKv5 \
@@ -159,7 +174,7 @@ jobs:
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=3' \
+            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 MANIA_FIRST_RELEASE=0' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
