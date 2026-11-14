@@ -145,7 +145,16 @@ jobs:
 
       - name: Build RSDKv5 and SaveEditor Framework
         run: |
-          xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 -configuration Release -sdk iphoneos -destination "generic/platform=iOS" IPHONEOS_DEPLOYMENT_TARGET=13.0 GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_USE_MOD_LOADER=1 RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 RETRO_USE_ORIGINAL_CODE=0' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR="$PWD/build_out"          mkdir -p SaveEditorMod/Objects
+                    xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 \
+            -configuration Release -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            IPHONEOS_DEPLOYMENT_TARGET=13.0 \
+            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_USE_MOD_LOADER=1 RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 RETRO_USE_ORIGINAL_CODE=0' \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            CONFIGURATION_BUILD_DIR="$PWD/build_out"
+
+          mkdir -p SaveEditorMod/Objects
+
           cat << 'EOF' > SaveEditorMod/Objects/Misc.h
           #ifndef OBJ_MISC_H
           #define OBJ_MISC_H
