@@ -417,7 +417,7 @@ jobs:
               ("SaveEditorMod/Objects/UISaveSlot.c", "dig5x7 = {", f"dig5x7{lb}12{rb}{lb}5{rb} = {{"),
               ("SaveEditorMod/Objects/UISaveSlot.c", "uint8 rows;", f"uint8 rows{lb}8{rb};"),
               ("SaveEditorMod/Objects/UISaveSlot.c", "koFont = {", f"koFont{lb}{rb} = {{"),
-              ("SaveEditorMod/Objects/UISaveSlot.c", "koFont / sizeof(koFont", f"koFont / sizeof(koFont{lb}0{rb}"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "sizeof(koFont));", f"sizeof(koFont{lb}0{rb}));"),
               ("SaveEditorMod/Objects/UISaveSlot.c", "&& p && p)", f"&& p{lb}1{rb} && p{lb}2{rb})"),
               ("SaveEditorMod/Objects/UISaveSlot.c", "((p & 0x0F) << 12)", f"((p{lb}0{rb} & 0x0F) << 12)"),
               ("SaveEditorMod/Objects/UISaveSlot.c", "((p & 0x3F) << 6)", f"((p{lb}1{rb} & 0x3F) << 6)"),
@@ -466,6 +466,7 @@ jobs:
           }
           #endif
           EOF
+
           GH="github.com"
           GAPI_REPO="RSDKModding/RSDKv5-GameAPI"
           git clone --depth 1 "https://${GH}/${GAPI_REPO}.git" GameAPI_SDK
