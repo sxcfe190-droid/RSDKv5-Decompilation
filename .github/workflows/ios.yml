@@ -1,4 +1,4 @@
-name: Build RSDKv5 iOS Ultimate LogFixed
+name: Build RSDKv5 iOS Ultimate Verified
 on:
   workflow_dispatch:
 jobs:
@@ -16,7 +16,7 @@ jobs:
         with:
           repository: "RSDKModding/Sonic-Mania-Decompilation"
           path: "Sonic-Mania-Decompilation"
-      - name: Apply Exact Log-Verified Patches
+      - name: Apply Verified C++ Safe Patches
         run: |
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
@@ -27,11 +27,12 @@ jobs:
               with open(p, "r", encoding="utf-8", errors="ignore") as f:
                   s = f.read()
               orig = s
-              if "ModAPI" in p:
-                  s = s.replace('dataPath + "mods"', 'std::string(userFilePath) + "mods"')
-                  s = s.replace('dataPath + "/mods"', 'std::string(userFilePath) + "mods"')
-                  s = s.replace('fs::path(dataPath) / "mods"', 'fs::path(userFilePath) / "mods"')
-                  s = re.sub(r'modPath\s*=\s*[^;]+;', 'modPath = (fs::path(userFilePath) / "mods").string() + "/"; fs::create_directories(modPath);', s)
+              if "ModAPI.cpp" in p:
+                  s = s.replace('"mods/"', '(std::string(userFilePath) + "mods/").c_str()')
+                  s = s.replace('"mods"', '(std::string(userFilePath) + "mods").c_str()')
+                  s = s.replace('dataPath + (std::string(userFilePath) +', '(std::string(userFilePath) +')
+                  s = s.replace('fs::path(dataPath) / (std::string(userFilePath) + "mods").c_str()', 'fs::path(userFilePath) / "mods"')
+                  s = re.sub(r'(void\s+[a-zA-Z0-9_:]*InitMods\s*\([^)]*\)\s*\{)', r'\1\n    fs::create_directories(fs::path(userFilePath) / "mods");\n', s)
               if "DevMenu" in p:
                   s = s.replace("modList.size() > 0", "true")
                   s = s.replace("modList.size() == 0", "false")
@@ -43,10 +44,6 @@ jobs:
               if "streamsEnabled" in s:
                   s = s.replace("streamsEnabled = false;", "streamsEnabled = true;")
                   s = s.replace("streamsEnabled = 0;", "streamsEnabled = 1;")
-              if "optionsPtr->volMusic" in s:
-                  s = s.replace("optionsPtr->volMusic", "(optionsPtr->volMusic > 100 ? 100 : optionsPtr->volMusic)")
-              if "optionsPtr->volSfx" in s:
-                  s = s.replace("optionsPtr->volSfx", "(optionsPtr->volSfx > 100 ? 100 : optionsPtr->volSfx)")
               if "Audio" in p:
                   s = re.sub(r"#if\s+RETRO_USING_VORBIS.*", "#if 1", s)
                   s = re.sub(r"#ifdef\s+RETRO_USING_VORBIS\b", "#if 1", s)
