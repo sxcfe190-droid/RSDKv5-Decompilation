@@ -1,4 +1,4 @@
-name: Inspect GameAPI Headers
+name: Inspect GameLink
 
 on:
   workflow_dispatch:
@@ -7,10 +7,9 @@ jobs:
   inspect:
     runs-on: macos-latest
     steps:
-      - name: Print Game.h Full Content
+      - name: Print GameLink.h
         run: |
           GH="github.com"
           REPO="RSDKModding/RSDKv5-GameAPI"
           git clone --depth 1 "https://${GH}/${REPO}.git" GAPI
-          find GAPI/C -type f
-          cat GAPI/C/GameAPI/Game.h
+          cat GAPI/C/GameAPI/GameLink.h
