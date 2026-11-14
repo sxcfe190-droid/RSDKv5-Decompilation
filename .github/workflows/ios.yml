@@ -396,6 +396,7 @@ jobs:
           }
           #endif
           EOF
+
           GH="github.com"
           GAPI_REPO="RSDKModding/RSDKv5-GameAPI"
           git clone --depth 1 "https://${GH}/${GAPI_REPO}.git" GameAPI_SDK
