@@ -91,8 +91,8 @@ jobs:
 
           with open("RSDKv5/RSDK/Audio/SDL2/SDL2AudioDevice.cpp", "r", encoding="utf-8") as f:
               s = f.read()
-          assert "SDL_OpenAudioDevice(" in s, "SDL_OpenAudioDevice not found in SDL2AudioDevice.cpp!"
-          s = s.replace("SDL_OpenAudioDevice(", 'SDL_SetHint(SDL_HINT_AUDIO_CATEGORY, "AVAudioSessionCategoryAmbient"); SDL_OpenAudioDevice(', 1)
+          assert "if ((device = SDL_OpenAudioDevice(" in s, "if ((device = SDL_OpenAudioDevice( not found in SDL2AudioDevice.cpp!"
+          s = s.replace("if ((device = SDL_OpenAudioDevice(", 'SDL_SetHint(SDL_HINT_AUDIO_CATEGORY, "AVAudioSessionCategoryAmbient");\n    if ((device = SDL_OpenAudioDevice(', 1)
           with open("RSDKv5/RSDK/Audio/SDL2/SDL2AudioDevice.cpp", "w", encoding="utf-8") as f:
               f.write(s)
 
