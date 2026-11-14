@@ -1,186 +1,74 @@
-name: Build RSDKv5 iOS Ultimate Verified
+name: Build RSDKv5 iOS Final
 on:
   workflow_dispatch:
 jobs:
   build-ios:
     runs-on: macos-latest
     steps:
-      - name: Checkout WamWooWam iOS Fork
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           repository: "WamWooWam/RSDKv5-Decompilation"
           ref: "ios"
           submodules: recursive
-      - name: Checkout Sonic Mania
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           repository: "RSDKModding/Sonic-Mania-Decompilation"
           path: "Sonic-Mania-Decompilation"
-      - name: Apply Verified C++ Safe Patches
+      - name: Patch Everything
         run: |
-          rm -rf Game
-          ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
+          rm -rf Game && ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
-          cat << 'EOF' > patch_all.py
+          curl -sL "https://githubusercontent.com" -o RSDKv5/RSDK/Audio/stb_vorbis.c
+          cat << 'EOF' > patch.py
           import glob, re
-          for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True) + glob.glob("RSDKv5/RSDK/**/*.h", recursive=True):
-              with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                  s = f.read()
-              orig = s
+          for p in glob.glob("RSDKv5/RSDK/**/*.*", recursive=True) + glob.glob("Sonic-Mania-Decompilation/**/*.*", recursive=True) + glob.glob("dependencies/ios/**/*.cpp", recursive=True):
+              if not p.endswith((".cpp", ".c", ".h", ".hpp")): continue
+              with open(p, "r", encoding="utf-8", errors="ignore") as f: s = f.read()
+              o = s
+              if "Audio.cpp" in p and "stb_vorbis.c" not in s: s = '#define STB_VORBIS_NO_PUSHDATA_API\n#include "stb_vorbis.c"\n' + s
+              if "ModAPI" in p or "FileIO" in p:
+                  s = s.replace('dataPath + "mods"', '(std::string(userFilePath) + "mods")').replace('dataPath + "/mods"', '(std::string(userFilePath) + "mods")').replace('fs::path(dataPath) / "mods"', 'fs::path(userFilePath) / "mods"')
               if "ModAPI.cpp" in p:
-                  s = s.replace('"mods/"', '(std::string(userFilePath) + "mods/").c_str()')
-                  s = s.replace('"mods"', '(std::string(userFilePath) + "mods").c_str()')
-                  s = s.replace('dataPath + (std::string(userFilePath) +', '(std::string(userFilePath) +')
-                  s = s.replace('fs::path(dataPath) / (std::string(userFilePath) + "mods").c_str()', 'fs::path(userFilePath) / "mods"')
-                  s = re.sub(r'(void\s+[a-zA-Z0-9_:]*InitMods\s*\([^)]*\)\s*\{)', r'\1\n    fs::create_directories(fs::path(userFilePath) / "mods");\n', s)
+                  s = re.sub(r'(void\s+[a-zA-Z0-9_:]*InitMods\s*\([^)]*\)\s*\{)', r'\1\n    fs::create_directories(fs::path(userFilePath) / "mods");\n    modPath = fs::path(userFilePath) / "mods";\n', s)
               if "DevMenu" in p:
-                  s = s.replace("modList.size() > 0", "true")
-                  s = s.replace("modList.size() == 0", "false")
-                  s = s.replace("!modList.empty()", "true")
-                  s = s.replace("modList.empty()", "false")
-              if "devMenu" in s:
-                  s = s.replace("devMenu = false;", "devMenu = true;")
-                  s = s.replace("devMenu = 0;", "devMenu = 1;")
-              if "streamsEnabled" in s:
-                  s = s.replace("streamsEnabled = false;", "streamsEnabled = true;")
-                  s = s.replace("streamsEnabled = 0;", "streamsEnabled = 1;")
-              if "Audio" in p:
-                  s = re.sub(r"#if\s+RETRO_USING_VORBIS.*", "#if 1", s)
-                  s = re.sub(r"#ifdef\s+RETRO_USING_VORBIS\b", "#if 1", s)
-                  s = re.sub(r"#ifndef\s+RETRO_USING_VORBIS\b", "#if 0", s)
-                  s = re.sub(r"#if\s+!RETRO_USING_VORBIS\b", "#if 0", s)
-                  s = re.sub(r"#if\s+USE_STB_VORBIS.*", "#if 1", s)
-              if "SDL_SCANCODE_" in s and "case SDL_SCANCODE_" not in s:
-                  s = re.sub(r"\bSDL_SCANCODE_[A-Z0-9_]+\b", "0x0", s)
-              if "SDL_CreateWindow(" in s:
-                  s = s.replace("SDL_WINDOW_FULLSCREEN_DESKTOP", "SDL_WINDOW_RESIZABLE")
-                  s = s.replace("SDL_WINDOW_FULLSCREEN", "SDL_WINDOW_RESIZABLE")
-                  s = s.replace("SDL_WINDOW_SHOWN", "SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE")
-              if s != orig:
-                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
-                      f.write(s)
-          for p in glob.glob("RSDKv5/RSDK/Input/**/*.cpp", recursive=True) + glob.glob("dependencies/ios/**/*.cpp", recursive=True):
-              with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                  s = f.read()
-              orig = s
-              if "SDL_InitSubSystem" in s:
-                  hints = 'SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0"); SDL_SetHint("SDL_AUDIO_CATEGORY", "ambient"); '
-                  s = s.replace("SDL_InitSubSystem(", hints + "SDL_InitSubSystem(")
-              if s != orig:
-                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
-                      f.write(s)
-          for p in glob.glob("dependencies/ios/SDL/src/audio/coreaudio/*.m", recursive=True) + glob.glob("dependencies/ios/SDL/src/video/uikit/*.m", recursive=True):
-              with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                  s = f.read()
-              orig = s
-              s = s.replace("AVAudioSessionCategorySoloAmbient", "AVAudioSessionCategoryAmbient")
-              s = s.replace("AVAudioSessionCategoryPlayback", "AVAudioSessionCategoryAmbient")
-              if s != orig:
-                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
-                      f.write(s)
-          for p in glob.glob("RSDKv5/RSDK/**/*.*", recursive=True) + glob.glob("Sonic-Mania-Decompilation/**/*.*", recursive=True):
-              if not p.endswith((".cpp", ".c", ".h", ".hpp")):
-                  continue
-              with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                  s = f.read()
-              orig = s
-              s = re.sub(r"#if\s+MANIA_USE_PLUS.*", "#if 1", s)
-              s = re.sub(r"#ifdef\s+MANIA_USE_PLUS\b", "#if 1", s)
-              s = re.sub(r"#ifndef\s+MANIA_USE_PLUS\b", "#if 0", s)
-              s = re.sub(r"#if\s+!MANIA_USE_PLUS\b", "#if 0", s)
-              s = re.sub(r"#if\s+MANIA_FIRST_RELEASE.*", "#if 0", s)
-              s = s.replace("#define MANIA_USE_PLUS 0", "#define MANIA_USE_PLUS 1")
-              s = s.replace("#define MANIA_FIRST_RELEASE 1", "#define MANIA_FIRST_RELEASE 0")
-              s = s.replace("dlcEnabled = false;", "dlcEnabled = true;")
-              s = s.replace("dlcEnabled = 0;", "dlcEnabled = 1;")
-              s = s.replace("API.CheckDLC(DLC_PLUS)", "true")
-              s = s.replace("CheckDLC(DLC_PLUS)", "true")
-              if s != orig:
-                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
-                      f.write(s)
+                  s = s.replace("modList.size() > 0", "true").replace("modList.size() == 0", "false").replace("!modList.empty()", "true").replace("modList.empty()", "false")
+              s = s.replace("devMenu = false;", "devMenu = true;").replace("devMenu = 0;", "devMenu = 1;").replace("streamsEnabled = false;", "streamsEnabled = true;").replace("streamsEnabled = 0;", "streamsEnabled = 1;")
+              if "SDL_SCANCODE_" in s and "case SDL_SCANCODE_" not in s: s = re.sub(r"\bSDL_SCANCODE_[A-Z0-9_]+\b", "0x0", s)
+              if "SDL_CreateWindow(" in s: s = s.replace("SDL_WINDOW_FULLSCREEN_DESKTOP", "SDL_WINDOW_RESIZABLE").replace("SDL_WINDOW_FULLSCREEN", "SDL_WINDOW_RESIZABLE").replace("SDL_WINDOW_SHOWN", "SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE")
+              if "SDL_InitSubSystem" in s: s = s.replace("SDL_InitSubSystem(", 'SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0"); SDL_InitSubSystem(')
+              s = s.replace("#define MANIA_USE_PLUS 0", "#define MANIA_USE_PLUS 1").replace("dlcEnabled = false;", "dlcEnabled = true;").replace("dlcEnabled = 0;", "dlcEnabled = 1;").replace("API.CheckDLC(DLC_PLUS)", "true").replace("CheckDLC(DLC_PLUS)", "true")
+              if s != o:
+                  with open(p, "w", encoding="utf-8", errors="ignore") as f: f.write(s)
           EOF
-          python3 patch_all.py
+          python3 patch.py
           cat << 'EOF' > RSDKv5/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
-          <plist version="1.0">
-          <dict>
-            <key>CFBundleDevelopmentRegion</key>
-            <string>en</string>
-            <key>CFBundleExecutable</key>
-            <string>$(EXECUTABLE_NAME)</string>
-            <key>CFBundleIdentifier</key>
-            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-            <key>CFBundleInfoDictionaryVersion</key>
-            <string>6.0</string>
-            <key>CFBundleName</key>
-            <string>$(PRODUCT_NAME)</string>
-            <key>CFBundlePackageType</key>
-            <string>APPL</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.3.2</string>
-            <key>CFBundleVersion</key>
-            <string>1</string>
-            <key>LSRequiresIPhoneOS</key>
-            <true/>
-            <key>UIRequiresFullScreen</key>
-            <false/>
-            <key>UIFileSharingEnabled</key>
-            <true/>
-            <key>LSSupportsOpeningDocumentsInPlace</key>
-            <true/>
-            <key>GCSupportedGameControllers</key>
-            <array>
-              <dict>
-                <key>ProfileName</key>
-                <string>ExtendedGamepad</string>
-              </dict>
-            </array>
-            <key>GCSupportsControllerUserInteraction</key>
-            <true/>
-            <key>UIRequiredDeviceCapabilities</key>
-            <array>
-              <string>arm64</string>
-            </array>
-            <key>UISupportedInterfaceOrientations</key>
-            <array>
-              <string>UIInterfaceOrientationPortrait</string>
-              <string>UIInterfaceOrientationPortraitUpsideDown</string>
-              <string>UIInterfaceOrientationLandscapeLeft</string>
-              <string>UIInterfaceOrientationLandscapeRight</string>
-            </array>
-            <key>UISupportedInterfaceOrientations~ipad</key>
-            <array>
-              <string>UIInterfaceOrientationPortrait</string>
-              <string>UIInterfaceOrientationPortraitUpsideDown</string>
-              <string>UIInterfaceOrientationLandscapeLeft</string>
-              <string>UIInterfaceOrientationLandscapeRight</string>
-            </array>
-          </dict>
-          </plist>
+          <plist version="1.0"><dict>
+            <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+            <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+            <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>1.3.2</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>LSRequiresIPhoneOS</key><true/>
+            <key>UIRequiresFullScreen</key><false/>
+            <key>UIFileSharingEnabled</key><true/>
+            <key>LSSupportsOpeningDocumentsInPlace</key><true/>
+            <key>GCSupportedGameControllers</key><array><dict><key>ProfileName</key><string>ExtendedGamepad</string></dict></array>
+            <key>GCSupportsControllerUserInteraction</key><true/>
+            <key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
+            <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
+            <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
+          </dict></plist>
           EOF
-      - name: Build RSDKv5 Engine
+      - name: Build & Package
         run: |
-          xcodebuild -project RSDKv5.xcodeproj \
-            -scheme RSDKv5 \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination "generic/platform=iOS" \
-            IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 MANIA_FIRST_RELEASE=0 RETRO_USE_STB_VORBIS=1 RETRO_USING_VORBIS=1' \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CONFIGURATION_BUILD_DIR="$PWD/build_out"
-      - name: Package IPA
-        run: |
-          mkdir -p Payload
-          cp -r build_out/RSDKv5.app Payload/
+          xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 -configuration Release -sdk iphoneos -destination "generic/platform=iOS" IPHONEOS_DEPLOYMENT_TARGET=13.0 GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 RETRO_USE_STB_VORBIS=1' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR="$PWD/build_out"
           mkdir -p Payload/RSDKv5.app/Frameworks
+          cp -r build_out/RSDKv5.app Payload/
           find build_out -maxdepth 3 -name "*.framework" -exec cp -rn {} Payload/RSDKv5.app/Frameworks/ \;
-          rm -rf Payload/RSDKv5.app/Frameworks/ManiaTouchControls.framework
-          rm -rf Payload/RSDKv5.app/Data/mods
-          rm -rf Payload/RSDKv5.app/mods
+          rm -rf Payload/RSDKv5.app/Frameworks/ManiaTouchControls.framework Payload/RSDKv5.app/Data/mods Payload/RSDKv5.app/mods
           DYLIB_SRC=$(find . -name "Game.dylib" | head -n 1)
           if [ -n "$DYLIB_SRC" ]; then
             cp "$DYLIB_SRC" Payload/RSDKv5.app/Frameworks/SonicMania
@@ -188,8 +76,7 @@ jobs:
             rm -f Payload/RSDKv5.app/Frameworks/Game.dylib
           fi
           zip -r RSDKv5-iOS.ipa Payload
-      - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: RSDKv5-iOS-IPA
           path: RSDKv5-iOS.ipa
