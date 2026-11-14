@@ -1,8 +1,8 @@
-name: Check Xcode Target Sources
+name: Fact Check Input & Mania Plus
 on:
   workflow_dispatch:
 jobs:
-  check-xcode:
+  fact-check:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,13 +11,16 @@ jobs:
           ref: "ios"
           submodules: recursive
 
-      - name: Print Xcode Compiled Input & Engine Files
+      - name: Print Real Build Targets & Plus Logic
         run: |
-          echo "=== 1. Xcode project.pbxproj Input & Engine references ==="
-          grep -n -E "InputDevice|RetroEngine|UserCore|ModAPI" RSDKv5.xcodeproj/project.pbxproj
+          echo "=== 1. Xcode project.pbxproj Input, Engine & Game references ==="
+          grep -n -E "InputDevice|RetroEngine|UserCore|ModAPI|Game\.xcodeproj|SonicMania" RSDKv5.xcodeproj/project.pbxproj || true
+
           echo "=== 2. Xcode Preprocessor Definitions ==="
-          grep -n -C 5 "GCC_PREPROCESSOR_DEFINITIONS" RSDKv5.xcodeproj/project.pbxproj
-          echo "=== 3. All SDL2InputDevice.cpp locations ==="
-          find . -name "SDL2InputDevice.cpp"
-          echo "=== 4. All RetroEngine.cpp locations ==="
-          find . -name "RetroEngine.cpp"
+          grep -n -C 5 "GCC_PREPROCESSOR_DEFINITIONS" RSDKv5.xcodeproj/project.pbxproj || true
+
+          echo "=== 3. All InputDevice & RetroEngine files in repo ==="
+          find . -maxdepth 5 -name "*InputDevice*.cpp" -o -name "RetroEngine.cpp"
+
+          echo "=== 4. Game/ Plus & Encore DLC Check Logic ==="
+          grep -rn -C 5 -E "MANIA_USE_PLUS|CheckDLC|DLC_PLUS|encore|Encore" Game/ | head -n 120 || true
