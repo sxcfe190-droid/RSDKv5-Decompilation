@@ -71,7 +71,7 @@ jobs:
               "KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT, KEYMASK_RIGHT, "
               "KEYMASK_A, KEYMASK_B, KEYMASK_C, KEYMASK_X, KEYMASK_Y, KEYMASK_Z, "
               "KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, "
-              "KEYMASK_BUMPERL, KEYMASK_BUMPERR"
+              "(KEYMASK_Z | KEYMASK_BUMPERL), (KEYMASK_C | KEYMASK_BUMPERR)"
           )
           s, n1 = re.subn(r"int32\s+buttonMap\[\]\s*=\s*\{[^;]+\};", f"int32 buttonMap[] = {{ {btns} }};", s, count=1)
           s, n2 = re.subn(r"int32\s+keyMasks\[\]\s*=\s*\{[^;]+\};", f"int32 keyMasks[] = {{ {masks} }};", s, count=1)
@@ -305,8 +305,7 @@ jobs:
               }
               return false;
           }
-          EOF
-          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.h
+          EOF          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.h
           #ifndef OBJ_UISAVESLOT_H
           #define OBJ_UISAVESLOT_H
           #include "GameAPI/Game.h"
@@ -423,6 +422,7 @@ jobs:
               out[digits] = 0;
           }
           EOF
+
           cat << 'EOF' >> SaveEditorMod/Objects/UISaveSlot.c
           void SaveEditor_OnDraw(void *data) {
               (void)data;
@@ -671,7 +671,7 @@ jobs:
               (ui, "valBuf = \x277\x27; valBuf = 0;",
                    f"valBuf{lb}2{rb} = \x277\x27; valBuf{lb}3{rb} = 0;"),
               (ui, "uint8 lst = {", f"uint8 lst{lb}3{rb} = {{"),
-              (ui, "uint8 prv = lst;", f"uint8 prv{lb}0{rb};"),
+              (ui, "prv = lst;", f"prv = lst{lb}0{rb};"),
               (ui, "(lst << 0) | (lst << 8);",
                    f"(lst{lb}0{rb} << 0) | (lst{lb}1{rb} << 8);"),
               (ui, "saveRAM->stock = lst;", f"saveRAM->stock = lst{lb}2{rb};"),
