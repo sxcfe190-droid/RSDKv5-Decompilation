@@ -1,8 +1,8 @@
-name: Build RSDKv5 iOS True Final
+name: Inspect Controller Mapping Code
 on:
   workflow_dispatch:
 jobs:
-  build-ios:
+  inspect-code:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -10,82 +10,28 @@ jobs:
           repository: "WamWooWam/RSDKv5-Decompilation"
           ref: "ios"
           submodules: recursive
-      - name: Patch Real Source Variables
+
+      - name: Print Controller INI & Mapping Source
         run: |
-          sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
-          cat << 'EOF' > patch.py
-          import glob, re
+          python3 - << 'EOF'
+          import glob
 
-          # 1. ModAPI.cpp: 앱 내부(SKU::appFileDir) -> 아이패드 파일 앱(SKU::userFileDir)으로 변경
-          with open("RSDKv5/RSDK/Core/ModAPI.cpp", "r", encoding="utf-8") as f:
-              s = f.read()
-          s = s.replace('sprintf(customUserFileDir, "%smods/%s/", SKU::appFileDir', 'sprintf(customUserFileDir, "%smods/%s/", SKU::userFileDir')
-          s = s.replace('sprintf_s(modBuf, sizeof(modBuf), "%smods", SKU::appFileDir);', 'sprintf_s(modBuf, sizeof(modBuf), "%smods", SKU::userFileDir); std::filesystem::create_directories(modBuf);')
-          with open("RSDKv5/RSDK/Core/ModAPI.cpp", "w", encoding="utf-8") as f:
-              f.write(s)
+          keywords = ["Keyboard Map", "SDL_CONTROLLER_BUTTON", "SDL_GameController", "Controller", "buttonA", "select"]
 
-          # 2. Debug.cpp: 모드가 0개여도 DevMenu > Mods 무조건 진입 허용
-          with open("RSDKv5/RSDK/Dev/Debug.cpp", "r", encoding="utf-8") as f:
-              s = f.read()
-          s = s.replace("if (modList.size() != 0)", "if (true)")
-          with open("RSDKv5/RSDK/Dev/Debug.cpp", "w", encoding="utf-8") as f:
-              f.write(s)
-
-          # 3. DevMenu 기본 활성화 + BGM 스트리밍 활성화 + 패드 1P 고정 + 창 크기 조절
-          for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True) + glob.glob("Game/**/*.cpp", recursive=True) + glob.glob("Game/**/*.h", recursive=True):
-              with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                  s = f.read()
-              o = s
-              s = s.replace("devMenu = false;", "devMenu = true;").replace("devMenu = 0;", "devMenu = 1;")
-              s = s.replace("streamsEnabled = false;", "streamsEnabled = true;").replace("streamsEnabled = 0;", "streamsEnabled = 1;")
-              if "SDL_SCANCODE_" in s and "case SDL_SCANCODE_" not in s:
-                  s = re.sub(r"\bSDL_SCANCODE_[A-Z0-9_]+\b", "0x0", s)
-              if "SDL_CreateWindow(" in s:
-                  s = s.replace("SDL_WINDOW_FULLSCREEN_DESKTOP", "SDL_WINDOW_RESIZABLE").replace("SDL_WINDOW_FULLSCREEN", "SDL_WINDOW_RESIZABLE").replace("SDL_WINDOW_SHOWN", "SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE")
-              if "SDL_InitSubSystem" in s:
-                  s = s.replace("SDL_InitSubSystem(", 'SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0"); SDL_InitSubSystem(')
-              s = s.replace("#define MANIA_USE_PLUS 0", "#define MANIA_USE_PLUS 1").replace("dlcEnabled = false;", "dlcEnabled = true;").replace("dlcEnabled = 0;", "dlcEnabled = 1;").replace("API.CheckDLC(DLC_PLUS)", "true").replace("CheckDLC(DLC_PLUS)", "true")
-              if s != o:
-                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
-                      f.write(s)
+          for path in sorted(glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True) + glob.glob("RSDKv5/RSDK/**/*.h", recursive=True)):
+              with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                  lines = f.readlines()
+              
+              hits = []
+              for i, line in enumerate(lines):
+                  if any(k in line for k in ["Keyboard Map", "SDL_CONTROLLER_BUTTON_", "InitControllers", "LoadSettings", "SaveSettings"]):
+                      start = max(0, i - 5)
+                      end = min(len(lines), i + 25)
+                      hits.append((i + 1, "".join(f"{ln+1}: {lines[ln]}" for ln in range(start, end))))
+              
+              if hits:
+                  print(f"\n==================== FILE: {path} ====================")
+                  for line_no, block in hits:
+                      print(f"--- Match around line {line_no} ---")
+                      print(block)
           EOF
-          python3 patch.py
-          cat << 'EOF' > RSDKv5/Info.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
-          <plist version="1.0"><dict>
-            <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
-            <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-            <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
-            <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>1.3.2</string>
-            <key>CFBundleVersion</key><string>1</string>
-            <key>LSRequiresIPhoneOS</key><true/>
-            <key>UIRequiresFullScreen</key><false/>
-            <key>UIFileSharingEnabled</key><true/>
-            <key>LSSupportsOpeningDocumentsInPlace</key><true/>
-            <key>GCSupportedGameControllers</key><array><dict><key>ProfileName</key><string>ExtendedGamepad</string></dict></array>
-            <key>GCSupportsControllerUserInteraction</key><true/>
-            <key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
-            <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
-            <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
-          </dict></plist>
-          EOF
-      - name: Build & Package
-        run: |
-          xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 -configuration Release -sdk iphoneos -destination "generic/platform=iOS" IPHONEOS_DEPLOYMENT_TARGET=13.0 GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_USE_MOD_LOADER=1 RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 RETRO_USE_ORIGINAL_CODE=0' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR="$PWD/build_out"
-          mkdir -p Payload/RSDKv5.app/Frameworks
-          cp -r build_out/RSDKv5.app Payload/
-          find build_out -maxdepth 3 -name "*.framework" -exec cp -rn {} Payload/RSDKv5.app/Frameworks/ \;
-          rm -rf Payload/RSDKv5.app/Frameworks/ManiaTouchControls.framework Payload/RSDKv5.app/Data/mods Payload/RSDKv5.app/mods
-          DYLIB_SRC=$(find . -name "Game.dylib" | head -n 1)
-          if [ -n "$DYLIB_SRC" ]; then
-            cp "$DYLIB_SRC" Payload/RSDKv5.app/Frameworks/SonicMania
-            install_name_tool -id "@rpath/SonicMania" Payload/RSDKv5.app/Frameworks/SonicMania
-            rm -f Payload/RSDKv5.app/Frameworks/Game.dylib
-          fi
-          zip -r RSDKv5-iOS.ipa Payload
-      - uses: actions/upload-artifact@v4
-        with:
-          name: RSDKv5-iOS-IPA
-          path: RSDKv5-iOS.ipa
