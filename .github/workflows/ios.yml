@@ -142,6 +142,7 @@ jobs:
           #ifndef OBJ_MISC_H
           #define OBJ_MISC_H
           #include "GameAPI/Game.h"
+          typedef enum { PLAYMODE_NONE = 0, PLAYMODE_REGULAR = 1, PLAYMODE_ENCORE = 2, PLAYMODE_TIMEATTACK = 4, PLAYMODE_COMPETITION = 8 } PlayModes;
           typedef enum { ZONE_GHZ = 0, ZONE_CPZ = 1, ZONE_SPZ = 2, ZONE_FBZ = 3, ZONE_PGZ = 4, ZONE_SSZ = 5, ZONE_HCZ = 6, ZONE_MSZ = 7, ZONE_OOZ = 8, ZONE_LRZ = 9, ZONE_MMZ = 10, ZONE_TMZ = 11, ZONE_ERZ = 12, ZONE_MAX = 13 } ZoneIDs;
           #endif
           EOF
@@ -153,7 +154,7 @@ jobs:
           typedef enum { MEDAL_SILVER = 1, MEDAL_GOLD = 2 } MedalTypes;
           typedef struct {
               uint8 goldMedals; uint8 silverMedals; uint8 field_2; uint8 field_3;
-              uint32 allGoldMedals; uint32 allSilverMedals; uint8 unlockedStages[32];
+              uint32 allGoldMedals; uint32 allSilverMedals; uint8 unlockedStages;
               uint8 emeraldObtained; uint8 unreadNotifs;
           } GameProgress;
           #endif
@@ -170,7 +171,7 @@ jobs:
               uint8 characterFlags; uint8 stock; uint16 playerID; uint16 filter;
               int32 collectedSpecialRings; int32 nextSpecialRing; int32 scoreBonus; int32 padding;
           } SaveRAM;
-          typedef struct { SaveRAM slots[16]; uint8 padding[0x1000]; } SaveDataFile;
+          typedef struct { SaveRAM slots; uint8 padding[0x1000]; } SaveDataFile;
           #endif
           EOF
 
@@ -255,7 +256,7 @@ jobs:
           } EntityUISaveSlot;
           extern ObjectUISaveSlot *UISaveSlot;
           bool32 UISaveSlot_State_Selected_Hook(bool32 skipped);
-          void UISaveSlot_SetupButtonElements_Hook(void);
+          bool32 UISaveSlot_SetupButtonElements_Hook(bool32 skipped);
           #endif
           EOF
           cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.c
@@ -335,25 +336,25 @@ jobs:
                                   saveRAM->chaosEmeralds = 0; for (int32 i = 0; i < em; ++i) saveRAM->chaosEmeralds |= (1 << i);
                                   self->saveEmeralds = saveRAM->chaosEmeralds;
                               } else if (editSelection == 2) {
-                                  uint8 lst[3] = { saveRAM->playerID & 0xFF, (saveRAM->playerID >> 8) & 0xFF, saveRAM->stock };
-                                  uint8 ml[3] = { 1, 2, 4 }; uint8 id = 0, cnt = 0;
+                                  uint8 lst = { saveRAM->playerID & 0xFF, (saveRAM->playerID >> 8) & 0xFF, saveRAM->stock };
+                                  uint8 ml = { 1, 2, 4 }; uint8 id = 0, cnt = 0;
                                   for (int32 i = 0; i < 3; ++i) { if (lst[i] == ml[editSelection]) id = i; if (lst[i]) cnt++; }
                                   uint8 nid = id + dir; if (nid >= cnt) nid = 0;
                                   uint8 prv = lst[id]; lst[id] = lst[nid]; lst[nid] = prv;
-                                  saveRAM->playerID = (lst[0] << 0) | (lst[1] << 8); saveRAM->stock = lst[2];
+                                  saveRAM->playerID = (lst << 0) | (lst << 8); saveRAM->stock = lst;
                               }
                           }
                           RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBleep.wav"), false, 255);
                           if (saveRAM->saveState == SAVEFILE_COMPLETE) self->frameID = 14;
                           else { self->frameID = self->saveZoneID + 1; if (self->isEncoreSave && self->saveZoneID >= ZONE_MSZ) self->frameID--; if (self->saveZoneID == ZONE_ERZ) self->frameID = 13; }
-                          UISaveSlot_SetupButtonElements_Hook();
+                          UISaveSlot_SetupButtonElements_Hook(false);
                       }
                       return true;
                   }
               }
               return false;
           }
-          void UISaveSlot_SetupButtonElements_Hook(void) {
+          bool32 UISaveSlot_SetupButtonElements_Hook(bool32 skipped) {
               RSDK_THIS(UISaveSlot);
               if (self->type == UISAVESLOT_REGULAR && !self->isNewSave && editingSave) {
                   SaveRAM *saveRAM = &saveDataCache.slots[self->slotID + (self->isEncoreSave ? 8 : 0)];
@@ -366,6 +367,7 @@ jobs:
                   RSDK.SetSpriteAnimation(UISaveSlot->aniFrames, 3, &self->livesAnimator, true, saveRAM->characterID - 1);
                   RSDK.SetSpriteAnimation(UISaveSlot->aniFrames, 4, &self->continuesAnimator, true, saveRAM->characterID - 1);
               }
+              return false;
           }
           EOF
           cat << 'EOF' > SaveEditorMod/dllmain.c
