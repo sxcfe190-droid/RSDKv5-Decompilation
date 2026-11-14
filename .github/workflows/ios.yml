@@ -1,8 +1,8 @@
-name: Fact Check Real iOS Input
+name: Fact Check iOS SDL MFi Mapping
 on:
   workflow_dispatch:
 jobs:
-  fact-check-input:
+  check-mfi:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,13 +11,7 @@ jobs:
           ref: "ios"
           submodules: recursive
 
-      - name: Print Real Active Input & B/X Debug Keys
+      - name: Print iOS SDL MFi Button Mapping Source
         run: |
-          echo "=== 1. Check how Input.cpp includes platform input ==="
-          nl -ba RSDKv5/RSDK/Input/Input.cpp | sed -n '1,80p'
-
-          echo "=== 2. Check all files referencing SDL_GameController or GCController ==="
-          grep -rn -C 5 -E "SDL_GameController|SDL_Joystick|GCController|RETRO_INPUT" RSDKv5/ || true
-
-          echo "=== 3. Check RetroEngine.cpp devMenu / B / X / step / freeze keys ==="
-          nl -ba RSDKv5/RSDK/Core/RetroEngine.cpp | sed -n '1370,1470p'
+          echo "=== SDL_mfijoystick.m GCExtendedGamepad / MFi button mapping ==="
+          grep -n -C 15 -E "buttonOptions|buttonMenu|buttonHome|SDL_CONTROLLER_BUTTON_BACK|SDL_CONTROLLER_BUTTON_START" dependencies/ios/SDL/src/joystick/iphoneos/SDL_mfijoystick.m || true
