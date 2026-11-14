@@ -366,7 +366,7 @@ jobs:
           extern ObjectUISaveSlot *UISaveSlot;
           bool32 UISaveSlot_State_Selected_Hook(bool32 skipped);
           bool32 UISaveSlot_SetupButtonElements_Hook(bool32 skipped);
-          void SaveEditor_OnDraw(void *data);
+          bool32 UISaveSlot_Draw_Hook(bool32 skipped);
           #endif
           EOF
 
@@ -460,9 +460,11 @@ jobs:
           EOF
           # --- END 5 ---
           cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot_p2.c
-          void SaveEditor_OnDraw(void *data) {
-              (void)data;
-              if (!editingSave) return;
+          bool32 UISaveSlot_Draw_Hook(bool32 skipped) {
+              (void)skipped;
+              RSDK_THIS(UISaveSlot);
+              if (!editingSave) return false;
+              if (self->slotID != editSlot || self->isEncoreSave != editIsEncore) return false;
               SaveRAM *saveRAM = &saveDataCache.slots[editSlot + (editIsEncore ? 8 : 0)];
               int32 bx = 8, by = 8, bw = 188, bh = 104;
               RSDK.DrawRect(bx, by, bw, bh, 0x000000, 210, INK_ALPHA, true);
@@ -533,6 +535,7 @@ jobs:
                       DrawPixText(bx + 13, ry, "7.SAVE EXIT", sel ? 0x00FF80 : 0xA0FFA0);
                   }
               }
+              return false;
           }
           EOF
           # --- END 6 ---
@@ -748,7 +751,10 @@ jobs:
                   Mod.GetPublicFunction(NULL, "UISaveSlot_SetupButtonElements"),
                   UISaveSlot_SetupButtonElements_Hook, false
               );
-              Mod.RegisterModCallback(MODCB_ONDRAW, SaveEditor_OnDraw);
+              Mod.RegisterStateHook(
+                  Mod.GetPublicFunction(NULL, "UISaveSlot_Draw"),
+                  UISaveSlot_Draw_Hook, false
+              );
           }
           #if RETRO_USE_MOD_LOADER
           bool32 LinkModLogic(EngineInfo *info, const char *id)
