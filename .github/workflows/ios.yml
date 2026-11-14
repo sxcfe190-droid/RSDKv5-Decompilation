@@ -175,61 +175,162 @@ jobs:
           bool32 editingSave = false;
           int32 editSlot = 0;
           int32 editSelection = 0;
-          uint16 fontAni = 0xFFFF;
           SaveDataFile saveDataCache;
           void SaveData_SaveCB(int32 status) { (void)status; }
           void SaveData_LoadCB(int32 status) { (void)status; }
 
+          static const uint8 dig5x7 = {
+              {0x3E,0x51,0x49,0x45,0x3E},{0x00,0x42,0x7F,0x40,0x00},
+              {0x42,0x61,0x51,0x49,0x46},{0x21,0x41,0x45,0x4B,0x31},
+              {0x18,0x14,0x12,0x7F,0x10},{0x27,0x45,0x45,0x45,0x39},
+              {0x3C,0x4A,0x49,0x49,0x30},{0x01,0x71,0x09,0x05,0x03},
+              {0x36,0x49,0x49,0x49,0x36},{0x06,0x49,0x49,0x29,0x1E},
+              {0x00,0x36,0x36,0x00,0x00},{0x08,0x08,0x3E,0x08,0x08}
+          };
+
+          typedef struct { uint16 code; uint8 rows; } HangulGlyph;
+          static const HangulGlyph koFont = {
+              {0xC2AC,{0x10,0x28,0x44,0x00,0x7E,0x00,0x3E,0x20}},
+              {0xB86F,{0x3E,0x02,0x3E,0x20,0x3E,0x08,0x7F,0x00}},
+              {0xCE90,{0x74,0x14,0x74,0x14,0x17,0x24,0x44,0x00}},
+              {0xB9AD,{0x3A,0x0A,0x3A,0x22,0x3A,0x00,0x3E,0x02}},
+              {0xD130,{0x7C,0x40,0x7C,0x46,0x7C,0x04,0x04,0x00}},
+              {0xC2A4,{0x10,0x28,0x44,0x00,0x00,0x7E,0x00,0x00}},
+              {0xD14C,{0x7A,0x42,0x7B,0x42,0x7A,0x02,0x02,0x00}},
+              {0xC774,{0x32,0x4A,0x4A,0x4A,0x32,0x02,0x02,0x00}},
+              {0xC9C0,{0x7A,0x12,0x2A,0x4A,0x02,0x02,0x02,0x00}},
+              {0xBAA9,{0x7E,0x42,0x7E,0x18,0x7E,0x00,0x3E,0x02}},
+              {0xC228,{0x10,0x28,0x44,0x7E,0x08,0x08,0x08,0x00}},
+              {0xCEE8,{0x78,0x10,0x7C,0x10,0x78,0x20,0x20,0x3E}},
+              {0xD2F0,{0x7A,0x42,0x7A,0x42,0x7A,0x02,0x02,0x00}},
+              {0xB274,{0x42,0x42,0x7E,0x00,0x7F,0x14,0x14,0x00}},
+              {0xC810,{0x7A,0x12,0x2A,0x4A,0x02,0x3E,0x22,0x3E}},
+              {0xC218,{0x10,0x28,0x44,0x00,0x7E,0x10,0x10,0x00}},
+              {0xC5D0,{0x32,0x4A,0x4B,0x4A,0x32,0x02,0x02,0x00}},
+              {0xBA38,{0x7A,0x4A,0x4B,0x4A,0x7A,0x02,0x02,0x00}},
+              {0xB784,{0x3E,0x02,0x3E,0x20,0x3E,0x00,0x3E,0x22}},
+              {0xB4DC,{0x7E,0x40,0x40,0x7E,0x00,0x7E,0x00,0x00}},
+              {0xC800,{0x7A,0x12,0x2B,0x4A,0x02,0x02,0x02,0x00}},
+              {0xC7A5,{0x32,0x4A,0x4B,0x4A,0x32,0x1C,0x22,0x1C}},
+              {0xD6C4,{0x18,0x7E,0x24,0x18,0x7E,0x10,0x10,0x00}},
+              {0xB2EB,{0x78,0x40,0x78,0x04,0x04,0x3E,0x22,0x3E}},
+              {0xAE30,{0x7A,0x0A,0x12,0x22,0x02,0x02,0x02,0x00}},
+              {0xB9E4,{0x7A,0x4A,0x4B,0x4A,0x7A,0x02,0x02,0x00}},
+              {0xB2C8,{0x42,0x42,0x7E,0x00,0x00,0x00,0x00,0x00}},
+              {0xC544,{0x30,0x48,0x48,0x30,0x00,0x3E,0x02,0x3E}},
+              {0xCF54,{0x7C,0x04,0x7C,0x04,0x10,0x7E,0x00,0x00}},
+              {0xC18C,{0x10,0x28,0x44,0x00,0x3E,0x02,0x3E,0x00}},
+              {0xB2C9,{0x42,0x42,0x7E,0x00,0x3E,0x22,0x3E,0x00}},
+              {0xC77C,{0x32,0x4A,0x4A,0x4A,0x32,0x3E,0x02,0x3E}},
+              {0xC988,{0x7E,0x18,0x24,0x42,0x00,0x3E,0x02,0x3E}},
+              {0xB108,{0x42,0x42,0x7E,0x10,0x7E,0x00,0x00,0x00}},
+              {0xD074,{0x7C,0x04,0x7C,0x04,0x7C,0x3E,0x02,0x3E}},
+              {0xB9C8,{0x7E,0x42,0x42,0x7E,0x00,0x00,0x00,0x00}},
+              {0xB808,{0x3E,0x02,0x3E,0x20,0x3F,0x00,0x00,0x00}},
+              {0xADF8,{0x7C,0x04,0x04,0x04,0x00,0x7E,0x00,0x00}},
+              {0xB9B0,{0x42,0x42,0x7E,0x00,0x3E,0x02,0x3E,0x20}},
+              {0xD790,{0x18,0x7E,0x24,0x18,0x00,0x3E,0x02,0x3E}},
+              {0xC5D4,{0x32,0x4A,0x4B,0x4A,0x32,0x02,0x3E,0x02}},
+              {0xD29C,{0x7C,0x40,0x7C,0x40,0x7C,0x10,0x7E,0x00}},
+              {0xB514,{0x7A,0x42,0x42,0x7A,0x02,0x02,0x02,0x00}},
+              {0xC624,{0x30,0x48,0x48,0x30,0x10,0x7E,0x00,0x00}},
+              {0xD50C,{0x18,0x7E,0x24,0x18,0x00,0x3E,0x02,0x3E}},
+              {0xB77C,{0x3E,0x02,0x3E,0x20,0x3E,0x00,0x00,0x00}},
+              {0xC789,{0x32,0x4A,0x4A,0x4A,0x32,0x3E,0x20,0x3E}},
+              {0xD504,{0x18,0x7E,0x24,0x18,0x00,0x7E,0x00,0x00}},
+              {0xD0C0,{0x7C,0x04,0x7C,0x04,0x7C,0x00,0x00,0x00}},
+              {0xB354,{0x7E,0x40,0x40,0x7E,0x00,0x7E,0x00,0x00}},
+              {0xD2B8,{0x7C,0x40,0x7C,0x40,0x7C,0x00,0x00,0x00}},
+              {0xD558,{0x18,0x7E,0x24,0x18,0x02,0x02,0x02,0x00}},
+              {0xB85C,{0x3E,0x02,0x3E,0x20,0x3E,0x10,0x7E,0x00}},
+              {0xBBF8,{0x7E,0x42,0x42,0x7E,0x00,0x00,0x00,0x00}},
+              {0xC96C,{0x7A,0x12,0x2A,0x4A,0x02,0x00,0x00,0x00}},
+              {0xC158,{0x10,0x28,0x44,0x00,0x00,0x3E,0x20,0x3E}},
+              {0xBC14,{0x42,0x7E,0x42,0x7E,0x00,0x00,0x00,0x00}},
+              {0xB9AC,{0x3E,0x02,0x3E,0x20,0x3E,0x02,0x02,0x00}},
+              {0xBA54,{0x7E,0x42,0x42,0x7E,0x00,0x00,0x00,0x00}},
+              {0xD0C8,{0x7C,0x04,0x7C,0x04,0x7C,0x1C,0x22,0x1C}},
+              {0xD0C4,{0x7C,0x04,0x7C,0x04,0x7C,0x3E,0x02,0x3E}},
+              {0xBC84,{0x42,0x7E,0x42,0x7E,0x00,0x3E,0x02,0x3E}},
+              {0xC62C,{0x30,0x48,0x48,0x30,0x10,0x7E,0x3E,0x02}},
+              {0xC5B4,{0x30,0x48,0x49,0x48,0x30,0x02,0x02,0x00}}
+          };
+          static void DrawKoStr(int32 x, int32 y, const char *utf8) {
+              const uint8 *p = (const uint8 *)utf8;
+              int32 cx = x;
+              while (*p) {
+                  if (*p < 0x80) {
+                      char c = (char)*p++;
+                      int32 di = -1;
+                      if (c >= '0' && c <= '9') di = c - '0';
+                      else if (c == ':') di = 10;
+                      else if (c == '+') di = 11;
+                      if (di >= 0) {
+                          for (int32 col = 0; col < 5; ++col) {
+                              uint8 bits = dig5x7[di][col];
+                              for (int32 r = 0; r < 7; ++r)
+                                  if (bits & (1 << r))
+                                      RSDK.DrawRect(cx + col, y + r + 1, 1, 1, 0xFFFFFF, 255, INK_NONE, true);
+                          }
+                          cx += 6;
+                      } else cx += 4;
+                  } else if ((*p & 0xE0) == 0xE0 && p && p) {
+                      uint16 u = ((p & 0x0F) << 12) | ((p & 0x3F) << 6) | (p & 0x3F);
+                      p += 3;
+                      int32 cnt = (int32)(sizeof(koFont) / sizeof(koFont));
+                      for (int32 k = 0; k < cnt; ++k) {
+                          if (koFont[k].code == u) {
+                              for (int32 r = 0; r < 8; ++r) {
+                                  uint8 rowb = koFont[k].rows[r];
+                                  for (int32 col = 0; col < 8; ++col)
+                                      if (rowb & (0x80 >> col))
+                                          RSDK.DrawRect(cx + col, y + r, 1, 1, 0xFFFFFF, 255, INK_NONE, true);
+                              }
+                              break;
+                          }
+                      }
+                      cx += 9;
+                  } else p++;
+              }
+          }
+
           void SaveEditor_OnDraw(void *data) {
               (void)data;
               if (!editingSave) return;
-              if (fontAni == 0xFFFF) fontAni = RSDK.LoadSpriteAnimation("UI/SmallFont.bin", SCOPE_STAGE);
-
               SaveRAM *saveRAM = &saveDataCache.slots[editSlot];
-              int32 bx = 8, by = 8, bw = 196, bh = 142;
-              RSDK.DrawRect(bx, by, bw, bh, 0x000000, 220, INK_ALPHA, true);
+              int32 bx = 8, by = 8, bw = 176, bh = 132;
+              RSDK.DrawRect(bx, by, bw, bh, 0xE86A17, 238, INK_ALPHA, true);
               RSDK.DrawRect(bx, by, bw, 1, 0xFFFFFF, 255, INK_NONE, true);
               RSDK.DrawRect(bx, by + bh - 1, bw, 1, 0xFFFFFF, 255, INK_NONE, true);
               RSDK.DrawRect(bx, by, 1, bh, 0xFFFFFF, 255, INK_NONE, true);
               RSDK.DrawRect(bx + bw - 1, by, 1, bh, 0xFFFFFF, 255, INK_NONE, true);
-              RSDK.DrawRect(bx + 3, by + 18 + editSelection * 15, bw - 6, 13, 0xE0A000, 190, INK_ALPHA, true);
+              RSDK.DrawRect(bx + 3, by + 5 + editSelection * 15, bw - 6, 13, 0xA83E00, 230, INK_ALPHA, true);
 
-              const char *chars = { "NONE", "SONIC+TAILS", "SONIC", "TAILS", "KNUCKLES", "MIGHTY", "RAY" };
-              const char *zones = { "GHZ", "CPZ", "SPZ", "FBZ", "PGZ", "SSZ", "HCZ", "MSZ", "OOZ", "LRZ", "MMZ", "TMZ", "ERZ", "CLEAR" };
+              const char *chars = {
+                  "없음", "소닉+테일즈", "소닉", "테일즈", "너클즈", "마이티", "레이"
+              };
+              const char *zones = {
+                  "그린힐", "케미컬", "스튜디오", "플라잉", "프레스",
+                  "스타더스트", "하이드로", "미라지", "오일오션", "라바리프",
+                  "메탈릭", "타이타닉", "에그레버리", "올클리어"
+              };
               int32 cIdx = saveRAM->characterID <= 6 ? saveRAM->characterID : 0;
               int32 zIdx = (saveRAM->saveState == SAVEFILE_COMPLETE) ? 13 : (saveRAM->zoneID <= 12 ? saveRAM->zoneID : 0);
               int32 emCnt = 0;
               for (int32 i = 0; i < 7; ++i) if (saveRAM->chaosEmeralds & (1 << i)) emCnt++;
 
               char buf;
-              snprintf(buf, 40, "SLOT: %d (%s)", editSlot + 1, editSlot >= 8 ? "ENCORE" : "MANIA");
-              snprintf(buf, 40, "CHARACTER: %s", chars[cIdx]);
-              snprintf(buf, 40, "ZONE: %s", zones[zIdx]);
-              snprintf(buf, 40, "LIVES: %d", saveRAM->lives);
-              snprintf(buf, 40, "CONTINUES: %d", saveRAM->continues);
-              snprintf(buf, 40, "SCORE: %d", saveRAM->score);
-              snprintf(buf, 40, "EMERALDS: %d", emCnt);
-              snprintf(buf, 40, "EXIT & SAVE");
+              snprintf(buf, 64, "슬롯: %d %s", editSlot + 1, editSlot >= 8 ? "앙코르" : "매니아");
+              snprintf(buf, 64, "캐릭터: %s", chars[cIdx]);
+              snprintf(buf, 64, "스테이지: %s", zones[zIdx]);
+              snprintf(buf, 64, "목숨: %d", saveRAM->lives);
+              snprintf(buf, 64, "컨티뉴: %d", saveRAM->continues);
+              snprintf(buf, 64, "점수: %d", saveRAM->score);
+              snprintf(buf, 64, "에메랄드: %d", emCnt);
+              snprintf(buf, 64, "저장 후 닫기");
 
-              if (fontAni != 0xFFFF) {
-                  Animator anim;
-                  memset(&anim, 0, sizeof(Animator));
-                  RSDK.SetSpriteAnimation(fontAni, 0, &anim, true, 0);
-                  String str;
-                  INIT_STRING(str);
-                  Vector2 pos;
-                  pos.x = TO_FIXED(bx + 8);
-                  pos.y = TO_FIXED(by + 5);
-                  RSDK.SetString(&str, "SAVE EDITOR (RB/B:SAVE)");
-                  RSDK.SetSpriteString(fontAni, 0, &str);
-                  RSDK.DrawText(&anim, &pos, &str, 0, str.length, ALIGN_LEFT, 0, NULL, NULL, true);
-
-                  for (int32 i = 0; i < 8; ++i) {
-                      pos.y = TO_FIXED(by + 20 + i * 15);
-                      RSDK.SetString(&str, buf[i]);
-                      RSDK.SetSpriteString(fontAni, 0, &str);
-                      RSDK.DrawText(&anim, &pos, &str, 0, str.length, ALIGN_LEFT, 0, NULL, NULL, true);
-                  }
+              for (int32 i = 0; i < 8; ++i) {
+                  DrawKoStr(bx + 8, by + 8 + i * 15, buf[i]);
               }
           }
           void SaveEditor_OnUpdate(void *data) {
@@ -313,17 +414,25 @@ jobs:
           lb, rb = chr(91), chr(93)
           reps = [
               ("SaveEditorMod/Objects/SaveGame.h", "SaveRAM slots;", f"SaveRAM slots{lb}16{rb};"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "dig5x7 = {", f"dig5x7{lb}12{rb}{lb}5{rb} = {{"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "uint8 rows;", f"uint8 rows{lb}8{rb};"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "koFont = {", f"koFont{lb}{rb} = {{"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "koFont / sizeof(koFont", f"koFont / sizeof(koFont{lb}0{rb}"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "&& p && p)", f"&& p{lb}1{rb} && p{lb}2{rb})"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "((p & 0x0F) << 12)", f"((p{lb}0{rb} & 0x0F) << 12)"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "((p & 0x3F) << 6)", f"((p{lb}1{rb} & 0x3F) << 6)"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "(p & 0x3F);", f"(p{lb}2{rb} & 0x3F);"),
               ("SaveEditorMod/Objects/UISaveSlot.c", "const char *chars = {", f"const char *chars{lb}7{rb} = {{"),
               ("SaveEditorMod/Objects/UISaveSlot.c", "const char *zones = {", f"const char *zones{lb}14{rb} = {{"),
-              ("SaveEditorMod/Objects/UISaveSlot.c", "char buf;", f"char buf{lb}8{rb}{lb}40{rb};"),
-              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"SLOT:", f"snprintf(buf{lb}0{rb}, 40, \"SLOT:"),
-              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"CHARACTER:", f"snprintf(buf{lb}1{rb}, 40, \"CHARACTER:"),
-              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"ZONE:", f"snprintf(buf{lb}2{rb}, 40, \"ZONE:"),
-              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"LIVES:", f"snprintf(buf{lb}3{rb}, 40, \"LIVES:"),
-              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"CONTINUES:", f"snprintf(buf{lb}4{rb}, 40, \"CONTINUES:"),
-              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"SCORE:", f"snprintf(buf{lb}5{rb}, 40, \"SCORE:"),
-              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"EMERALDS:", f"snprintf(buf{lb}6{rb}, 40, \"EMERALDS:"),
-              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"EXIT", f"snprintf(buf{lb}7{rb}, 40, \"EXIT"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "char buf;", f"char buf{lb}8{rb}{lb}64{rb};"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 64, \"슬롯:", f"snprintf(buf{lb}0{rb}, 64, \"슬롯:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 64, \"캐릭터:", f"snprintf(buf{lb}1{rb}, 64, \"캐릭터:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 64, \"스테이지:", f"snprintf(buf{lb}2{rb}, 64, \"스테이지:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 64, \"목숨:", f"snprintf(buf{lb}3{rb}, 64, \"목숨:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 64, \"컨티뉴:", f"snprintf(buf{lb}4{rb}, 64, \"컨티뉴:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 64, \"점수:", f"snprintf(buf{lb}5{rb}, 64, \"점수:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 64, \"에메랄드:", f"snprintf(buf{lb}6{rb}, 64, \"에메랄드:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 64, \"저장 후 닫기", f"snprintf(buf{lb}7{rb}, 64, \"저장 후 닫기"),
           ]
           for path, old, new in reps:
               s = open(path).read()
