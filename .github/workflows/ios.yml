@@ -1,4 +1,4 @@
-name: Inspect RSDK DrawText and UISaveSlot
+name: Inspect RSDK Draw Functions
 
 on:
   workflow_dispatch:
@@ -7,11 +7,9 @@ jobs:
   inspect:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: WamWooWam/RSDKv5-Decompilation
-          ref: ios
-
-      - name: Print RSDK Draw Functions
+      - name: Print RSDK Draw Functions in GameLink.h
         run: |
-          grep -rn -C 5 "DrawRect\|DrawText\|LoadFont\|SetSpriteString" RSDKv5/RSDK/Core/ModAPI.hpp
+          GH="github.com"
+          REPO="RSDKModding/RSDKv5-GameAPI"
+          git clone --depth 1 "https://${GH}/${REPO}.git" GAPI
+          grep -rn -i "Draw" GAPI/C/GameAPI/GameLink.h || true
