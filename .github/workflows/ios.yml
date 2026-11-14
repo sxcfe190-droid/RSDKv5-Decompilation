@@ -156,7 +156,7 @@ jobs:
           typedef enum { MEDAL_SILVER = 1, MEDAL_GOLD = 2 } MedalTypes;
           typedef struct {
               uint8 goldMedals; uint8 silverMedals; uint8 field_2; uint8 field_3;
-              uint32 allGoldMedals; uint32 allSilverMedals; uint8 unlockedStages;
+              uint32 allGoldMedals; uint32 allSilverMedals; uint8 unlockedStages[32];
               uint8 emeraldObtained; uint8 unreadNotifs;
           } GameProgress;
           #endif
@@ -171,7 +171,7 @@ jobs:
           typedef struct {
               uint8 saveState; uint8 characterID; uint8 zoneID; uint8 lives;
               uint8 score; uint8 score1UP; uint8 chaosEmeralds; uint8 continues;
-              uint8 characterFlags; uint8 stock; uint8 playerID; uint8 filter;
+              uint8 characterFlags; uint8 stock[3]; uint16 playerID; uint16 filter;
               int32 collectedSpecialRings; int32 nextSpecialRing; int32 scoreBonus; int32 padding;
           } SaveRAM;
           #endif
@@ -182,7 +182,7 @@ jobs:
           #define OBJ_UIMEDALLIONPANEL_H
           #include "GameAPI/Game.h"
           #include "GameProgress.h"
-          typedef struct { RSDK_OBJECT } ObjectUIMedallionPanel;
+          typedef struct { RSDK_OBJECT uint16 aniFrames; } ObjectUIMedallionPanel;
           typedef struct {
               RSDK_ENTITY
               StateMachine(state);
@@ -193,7 +193,8 @@ jobs:
           bool32 UIMedallionPanel_State_Selected_Hook(bool32 skipped);
           #endif
           EOF
-          cat << 'EOF' > SaveEditorMod/Objects/UIMedallionPanel.c
+
+                    cat << 'EOF' > SaveEditorMod/Objects/UIMedallionPanel.c
           #include "UIMedallionPanel.h"
           #include "Misc.h"
           ObjectUIMedallionPanel *UIMedallionPanel;
@@ -229,8 +230,8 @@ jobs:
                           progress->allSilverMedals &= ~(1 << id); progress->allGoldMedals &= ~(1 << id); break;
                       default: break;
                   }
-                  RSDK.SetSpriteAnimation(self->animator.spriteID, 5, &self->animator, true, self->medal);
-                  Mod.CallModCallback(MODCB_ONSAVE, (void *)SAVE_MEDALLIONS);
+                  RSDK.SetSpriteAnimation(UIMedallionPanel->aniFrames, 5, &self->animator, true, self->medal);
+                  Mod.SaveGameProgress();
                   RSDK.PlaySfx(RSDK.GetSfx("Stage/SpecialRing.wav"), false, 255);
               }
               return false;
@@ -267,6 +268,7 @@ jobs:
           void UISaveSlot_SetupButtonElements_Hook(void);
           #endif
           EOF
+
           cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.c
           #include "UISaveSlot.h"
           ObjectUISaveSlot *UISaveSlot;
@@ -298,7 +300,7 @@ jobs:
                       SaveRAM *saveRAM = (SaveRAM *)Mod.GetSaveRAM() + (self->slotID + (self->isEncoreSave ? 8 : 0));
                       if (ControllerInfo[CONT_ANY].keyB.press || ControllerInfo[CONT_ANY].keyBumperR.press || touchPress) {
                           editingSave = false; RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBack.wav"), false, 255);
-                          Mod.CallModCallback(MODCB_ONSAVE, (void *)SAVE_ALL); return true;
+                          Mod.SaveSaveRAM(); return true;
                       }
                       if (ControllerInfo[CONT_ANY].keyLeft.press) {
                           if (--editSelection < 0) editSelection = self->isEncoreSave ? 2 : 3;
@@ -340,12 +342,12 @@ jobs:
                                   saveRAM->chaosEmeralds = 0; for (int32 i = 0; i < em; ++i) saveRAM->chaosEmeralds |= (1 << i);
                                   self->saveEmeralds = saveRAM->chaosEmeralds;
                               } else if (editSelection == 2) {
-                                  uint8 lst = { saveRAM->playerID & 0xFF, (saveRAM->playerID >> 8) & 0xFF, saveRAM->stock };
-                                  uint8 ml = { 1, 2, 4 }; uint8 id = 0, cnt = 0;
+                                  uint8 lst[3] = { saveRAM->playerID & 0xFF, (saveRAM->playerID >> 8) & 0xFF, saveRAM->stock[0] };
+                                  uint8 ml[3] = { 1, 2, 4 }; uint8 id = 0, cnt = 0;
                                   for (int32 i = 0; i < 3; ++i) { if (lst[i] == ml[editSelection]) id = i; if (lst[i]) cnt++; }
                                   uint8 nid = id + dir; if (nid >= cnt) nid = 0;
                                   uint8 prv = lst[id]; lst[id] = lst[nid]; lst[nid] = prv;
-                                  saveRAM->playerID = (lst << 0) | (lst << 8); saveRAM->stock = lst;
+                                  saveRAM->playerID = (lst[0] << 0) | (lst[1] << 8); saveRAM->stock[0] = lst[2];
                               }
                           }
                           RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBleep.wav"), false, 255);
@@ -373,6 +375,7 @@ jobs:
               }
           }
           EOF
+
           cat << 'EOF' > SaveEditorMod/dllmain.c
           #include "GameAPI/Game.h"
           #include "Objects/UISaveSlot.h"
