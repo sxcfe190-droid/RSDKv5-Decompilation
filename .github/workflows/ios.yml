@@ -23,16 +23,13 @@ jobs:
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
           cat << 'EOF' > patch_all.py
           import glob, re
-          for p in glob.glob("RSDKv5/**/*.*", recursive=True):
-              if not p.endswith((".cpp", ".mm", ".m", ".h", ".hpp")):
-                  continue
+          for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True) + glob.glob("RSDKv5/RSDK/**/*.h", recursive=True):
               with open(p, "r", encoding="utf-8", errors="ignore") as f:
                   s = f.read()
               orig = s
               s = s.replace('dataPath + "mods"', '(fs::path(userFilePath) / "mods").string()')
               s = s.replace('dataPath + "/mods"', '(fs::path(userFilePath) / "mods").string()')
               s = s.replace('fs::path(dataPath) / "mods"', 'fs::path(userFilePath) / "mods"')
-              s = s.replace('[[NSBundle mainBundle] resourcePath]', 'NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject')
               if "ModAPI.cpp" in p:
                   inject = (
                       '\n    fs::path extModDir = fs::path(userFilePath) / "mods";\n'
@@ -47,21 +44,17 @@ jobs:
                   )
                   s = re.sub(r"(void\s+Mod::InitMods\s*\([^)]*\)\s*\{)", r"\1" + inject, s)
                   s = re.sub(r"modPath\s*=\s*[^;]*dataPath[^;]*;", 'modPath = (fs::path(userFilePath) / "mods").string() + "/";', s)
-                  s = re.sub(r"modPath\s*=\s*[^;]*Bundle[^;]*;", 'modPath = (fs::path(userFilePath) / "mods").string() + "/";', s)
               if "DevMenu" in p:
                   s = s.replace("modList.size() > 0", "true")
                   s = s.replace("modList.size() == 0", "false")
                   s = s.replace("!modList.empty()", "true")
                   s = s.replace("modList.empty()", "false")
-                  s = re.sub(r"(void\s+OpenModsMenu\s*\([^)]*\)\s*\{)", r"\1\n    Mod::InitMods();\n", s)
               if "devMenu" in s:
                   s = s.replace("devMenu = false;", "devMenu = true;")
                   s = s.replace("devMenu = 0;", "devMenu = 1;")
               if "streamsEnabled" in s:
                   s = s.replace("streamsEnabled = false;", "streamsEnabled = true;")
                   s = s.replace("streamsEnabled = 0;", "streamsEnabled = 1;")
-              if "volMusic" in s:
-                  s = re.sub(r"(volMusic\s*=\s*[^;]+;)", r"\1 if (volMusic > 100) volMusic = 100;", s)
               if "SDL_SCANCODE_" in s and "case SDL_SCANCODE_" not in s:
                   s = re.sub(r"\bSDL_SCANCODE_[A-Z0-9_]+\b", "0x0", s)
               if "SDL_CreateWindow(" in s:
@@ -71,23 +64,17 @@ jobs:
               if s != orig:
                   with open(p, "w", encoding="utf-8", errors="ignore") as f:
                       f.write(s)
-          for p in glob.glob("RSDKv5/**/*.*", recursive=True) + glob.glob("dependencies/ios/**/*.*", recursive=True):
-              if not p.endswith((".cpp", ".c", ".m", ".mm", ".h")):
-                  continue
+          for p in glob.glob("RSDKv5/RSDK/Input/**/*.cpp", recursive=True) + glob.glob("dependencies/ios/**/*.cpp", recursive=True):
               with open(p, "r", encoding="utf-8", errors="ignore") as f:
                   s = f.read()
               orig = s
               if "SDL_InitSubSystem" in s:
                   hints = 'SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0"); SDL_SetHint(SDL_HINT_AUDIO_CATEGORY, "ambient"); '
                   s = s.replace("SDL_InitSubSystem(", hints + "SDL_InitSubSystem(")
-              s = s.replace("AVAudioSessionCategorySoloAmbient", "AVAudioSessionCategoryAmbient")
-              s = s.replace("AVAudioSessionCategoryOptionDuckOthers", "AVAudioSessionCategoryOptionMixWithOthers")
-              s = re.sub(r"\[session\s+setCategory:([^\s\]]+)\s+error:", r"[session setCategory:AVAudioSessionCategoryAmbient withOptions:AVAudioSessionCategoryOptionMixWithOthers error:", s)
-              s = re.sub(r"\[session\s+setCategory:([^\s\]]+)\s+withOptions:([^\]]+)\s+error:", r"[session setCategory:AVAudioSessionCategoryAmbient withOptions:AVAudioSessionCategoryOptionMixWithOthers error:", s)
               if s != orig:
                   with open(p, "w", encoding="utf-8", errors="ignore") as f:
                       f.write(s)
-          for p in glob.glob("RSDKv5/**/*.*", recursive=True) + glob.glob("Sonic-Mania-Decompilation/**/*.*", recursive=True):
+          for p in glob.glob("RSDKv5/RSDK/**/*.*", recursive=True) + glob.glob("Sonic-Mania-Decompilation/**/*.*", recursive=True):
               if not p.endswith((".cpp", ".c", ".h", ".hpp")):
                   continue
               with open(p, "r", encoding="utf-8", errors="ignore") as f:
