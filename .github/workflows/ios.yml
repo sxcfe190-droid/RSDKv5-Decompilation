@@ -1,4 +1,4 @@
-name: Deep Inspect Mod Loading Internals
+name: Inspect LoadMod and Debug Mods Toggle
 
 on:
   workflow_dispatch:
@@ -12,11 +12,9 @@ jobs:
           repository: WamWooWam/RSDKv5-Decompilation
           ref: ios
 
-      - name: Inspect ModAPI, Link, and EngineInfo Internals
+      - name: Print ModAPI.cpp 261-550 and Debug.cpp
         run: |
-          echo "=== 1. Link.hpp ==="
-          cat RSDKv5/RSDK/Core/Link.hpp
-          echo "=== 2. ModAPI.hpp ==="
-          cat RSDKv5/RSDK/Core/ModAPI.hpp
-          echo "=== 3. ModAPI.cpp (LoadMods & Activate) ==="
-          nl -ba RSDKv5/RSDK/Core/ModAPI.cpp | sed -n '1,260p'
+          echo "=== ModAPI.cpp 261-550 ==="
+          nl -ba RSDKv5/RSDK/Core/ModAPI.cpp | sed -n '261,550p'
+          echo "=== Debug.cpp Mods Menu ==="
+          grep -rn -C 25 "MANAGE MODS\|LoadMod(" RSDKv5/RSDK/Dev/Debug.cpp
