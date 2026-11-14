@@ -348,7 +348,6 @@ jobs:
 
           void SaveEditor_OnUpdate(void *data) {
               (void)data;
-              if (SceneInfo->listCategory != 0) { editingSave = false; return; }
 
               bool32 touched = false;
               if (TouchInfo->count) {
