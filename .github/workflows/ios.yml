@@ -62,7 +62,6 @@ jobs:
           with open("RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp", "w", encoding="utf-8") as f:
               f.write(s)
 
-          # SDL2RenderDevice.cpp: B버튼(iOS 취소 HID 이벤트)이 ESCAPE 키 이벤트로 들어와 DevMenu를 여는 통로 제거
           with open("RSDKv5/RSDK/Graphics/SDL2/SDL2RenderDevice.cpp", "r", encoding="utf-8") as f:
               s = f.read()
           assert "case SDL_SCANCODE_ESCAPE:" in s, "SDL_SCANCODE_ESCAPE not found in SDL2RenderDevice.cpp!"
@@ -71,7 +70,6 @@ jobs:
           with open("RSDKv5/RSDK/Graphics/SDL2/SDL2RenderDevice.cpp", "w", encoding="utf-8") as f:
               f.write(s)
 
-          # RetroEngine.cpp: 오직 왼쪽 가운데 버튼(BACK -> keySelect)만 DevMenu를 열도록 보장
           with open("RSDKv5/RSDK/Core/RetroEngine.cpp", "r", encoding="utf-8") as f:
               s = f.read()
           target = "if (controller[CONT_P1].keySelect.press)"
@@ -134,144 +132,8 @@ jobs:
             rm -f Payload/RSDKv5.app/Frameworks/Game.dylib
           fi
           zip -r RSDKv5-iOS.ipa Payload
-name: Build RSDKv5 iOS True Final
-on:
-  workflow_dispatch:
 
-jobs:
-  build-ios:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: "WamWooWam/RSDKv5-Decompilation"
-          ref: "ios"
-          submodules: recursive
-
-      - name: Patch Real Source Variables
-        run: |
-          sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
-          cat << 'EOF' > patch.py
-          import glob, re
-
-          with open("RSDKv5/RSDK/Core/ModAPI.cpp", "r", encoding="utf-8") as f:
-              s = f.read()
-          s = s.replace('sprintf(customUserFileDir, "%smods/%s/", SKU::appFileDir', 'sprintf(customUserFileDir, "%smods/%s/", SKU::userFileDir')
-          s = s.replace('sprintf_s(modBuf, sizeof(modBuf), "%smods", SKU::appFileDir);', 'sprintf_s(modBuf, sizeof(modBuf), "%smods", SKU::userFileDir); std::filesystem::create_directories(modBuf);')
-          with open("RSDKv5/RSDK/Core/ModAPI.cpp", "w", encoding="utf-8") as f:
-              f.write(s)
-
-          with open("RSDKv5/RSDK/Dev/Debug.cpp", "r", encoding="utf-8") as f:
-              s = f.read()
-          s = s.replace("if (modList.size() != 0)", "if (true)")
-          with open("RSDKv5/RSDK/Dev/Debug.cpp", "w", encoding="utf-8") as f:
-              f.write(s)
-
-          with open("RSDKv5/RSDK/User/Core/UserCore.cpp", "r", encoding="utf-8") as f:
-              s = f.read()
-          s, n_vk = re.subn(
-              r"\{ VK_UP,[^}]+\},\s*\{ VK_NUMPAD8,[^}]+\},",
-              "{ KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING },\n        { KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING },",
-              s,
-              count=1
-          )
-          assert n_vk == 1, f"Failed to patch defaultKeyMaps VK_*: n_vk={n_vk}"
-          with open("RSDKv5/RSDK/User/Core/UserCore.cpp", "w", encoding="utf-8") as f:
-              f.write(s)
-
-          with open("RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp", "r", encoding="utf-8") as f:
-              s = f.read()
-          s, n1 = re.subn(
-              r"int32\s+buttonMap\[\]\s*=\s*\{[^;]+\};",
-              "int32 buttonMap[] = { SDL_CONTROLLER_BUTTON_DPAD_UP, SDL_CONTROLLER_BUTTON_DPAD_DOWN, SDL_CONTROLLER_BUTTON_DPAD_LEFT, SDL_CONTROLLER_BUTTON_DPAD_RIGHT, SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_START, SDL_CONTROLLER_BUTTON_BACK, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID };",
-              s,
-              count=1
-          )
-          s, n2 = re.subn(
-              r"int32\s+keyMasks\[\]\s*=\s*\{[^;]+\};",
-              "int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT, KEYMASK_RIGHT, KEYMASK_A, KEYMASK_B, KEYMASK_C, KEYMASK_X, KEYMASK_Y, KEYMASK_Z, KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };",
-              s,
-              count=1
-          )
-          assert n1 == 1 and n2 == 1, f"Failed to patch buttonMap/keyMasks: n1={n1}, n2={n2}"
-          s = s.replace("device->swapABXY = true;", "device->swapABXY = false;")
-          with open("RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp", "w", encoding="utf-8") as f:
-              f.write(s)
-
-          # SDL2RenderDevice.cpp: B버튼(iOS 취소 HID 이벤트)이 ESCAPE 키 이벤트로 들어와 DevMenu를 여는 통로 제거
-          with open("RSDKv5/RSDK/Graphics/SDL2/SDL2RenderDevice.cpp", "r", encoding="utf-8") as f:
-              s = f.read()
-          assert "case SDL_SCANCODE_ESCAPE:" in s, "SDL_SCANCODE_ESCAPE not found in SDL2RenderDevice.cpp!"
-          s = s.replace("case SDL_SCANCODE_ESCAPE:\n                        if (engine.devMenu) {", "case SDL_SCANCODE_ESCAPE:\n                        if (false && engine.devMenu) {")
-          assert "if (false && engine.devMenu)" in s, "Failed to disable ESCAPE OpenDevMenu in SDL2RenderDevice.cpp!"
-          with open("RSDKv5/RSDK/Graphics/SDL2/SDL2RenderDevice.cpp", "w", encoding="utf-8") as f:
-              f.write(s)
-
-          # RetroEngine.cpp: 오직 왼쪽 가운데 버튼(BACK -> keySelect)만 DevMenu를 열도록 보장
-          with open("RSDKv5/RSDK/Core/RetroEngine.cpp", "r", encoding="utf-8") as f:
-              s = f.read()
-          target = "if (controller[CONT_P1].keySelect.press)"
-          replacement = "bool32 anyJump = controller[CONT_ANY].keyA.down || controller[CONT_ANY].keyB.down || controller[CONT_ANY].keyC.down || controller[CONT_ANY].keyX.down || controller[CONT_ANY].keyY.down || controller[CONT_ANY].keyA.press || controller[CONT_ANY].keyB.press || controller[CONT_ANY].keyC.press || controller[CONT_ANY].keyX.press || controller[CONT_ANY].keyY.press;\n    if (!anyJump && (controller[CONT_P1].keySelect.press || controller[CONT_ANY].keySelect.press))"
-          assert target in s, "keySelect.press check missing in RetroEngine.cpp!"
-          s = s.replace(target, replacement, 1)
-          assert replacement in s, "RetroEngine.cpp replacement failed!"
-          with open("RSDKv5/RSDK/Core/RetroEngine.cpp", "w", encoding="utf-8") as f:
-              f.write(s)
-
-          for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True) + glob.glob("Game/**/*.c", recursive=True) + glob.glob("Game/**/*.cpp", recursive=True) + glob.glob("Game/**/*.h", recursive=True):
-              with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                  s = f.read()
-              o = s
-              s = s.replace("devMenu = false;", "devMenu = true;").replace("devMenu = 0;", "devMenu = 1;")
-              s = s.replace("streamsEnabled = false;", "streamsEnabled = true;").replace("streamsEnabled = 0;", "streamsEnabled = 1;")
-              if "SDL_CreateWindow(" in s:
-                  s = s.replace("SDL_WINDOW_FULLSCREEN_DESKTOP", "SDL_WINDOW_RESIZABLE").replace("SDL_WINDOW_FULLSCREEN", "SDL_WINDOW_RESIZABLE").replace("SDL_WINDOW_SHOWN", "SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE")
-              if "SDL_InitSubSystem" in s:
-                  s = s.replace("SDL_InitSubSystem(", 'SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0"); SDL_InitSubSystem(')
-              s = s.replace("#define MANIA_USE_PLUS 0", "#define MANIA_USE_PLUS 1").replace("dlcEnabled = false;", "dlcEnabled = true;").replace("dlcEnabled = 0;", "dlcEnabled = 1;").replace("API.CheckDLC(DLC_PLUS)", "true").replace("CheckDLC(DLC_PLUS)", "true")
-              if s != o:
-                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
-                      f.write(s)
-          EOF
-          python3 patch.py
-          cat << 'EOF' > RSDKv5/Info.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
-          <plist version="1.0"><dict>
-            <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
-            <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-            <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
-            <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>1.3.2</string>
-            <key>CFBundleVersion</key><string>1</string>
-            <key>LSRequiresIPhoneOS</key><true/>
-            <key>UIRequiresFullScreen</key><false/>
-            <key>UIFileSharingEnabled</key><true/>
-            <key>LSSupportsOpeningDocumentsInPlace</key><true/>
-            <key>GCSupportedGameControllers</key><array><dict><key>ProfileName</key><string>ExtendedGamepad</string></dict></array>
-            <key>GCSupportsControllerUserInteraction</key><true/>
-            <key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
-            <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
-            <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
-          </dict></plist>
-          EOF
-
-      - name: Build & Package
-        run: |
-          xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 -configuration Release -sdk iphoneos -destination "generic/platform=iOS" IPHONEOS_DEPLOYMENT_TARGET=13.0 GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_USE_MOD_LOADER=1 RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 RETRO_USE_ORIGINAL_CODE=0' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR="$PWD/build_out"
-          mkdir -p Payload/RSDKv5.app/Frameworks
-          cp -r build_out/RSDKv5.app Payload/
-          find build_out -maxdepth 3 -name "*.framework" -exec cp -rn {} Payload/RSDKv5.app/Frameworks/ \;
-          rm -rf Payload/RSDKv5.app/Frameworks/ManiaTouchControls.framework Payload/RSDKv5.app/Data/mods Payload/RSDKv5.app/mods
-          DYLIB_SRC=$(find . -name "Game.dylib" | head -n 1)
-          if [ -n "$DYLIB_SRC" ]; then
-            cp "$DYLIB_SRC" Payload/RSDKv5.app/Frameworks/SonicMania
-            install_name_tool -id "@rpath/SonicMania" Payload/RSDKv5.app/Frameworks/SonicMania
-            rm -f Payload/RSDKv5.app/Frameworks/Game.dylib
-          fi
-          zip -r RSDKv5-iOS.ipa Payload
       - uses: actions/upload-artifact@v4
         with:
           name: RSDKv5-iOS-IPA
           path: RSDKv5-iOS.ipa
-
