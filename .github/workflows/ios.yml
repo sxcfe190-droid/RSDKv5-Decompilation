@@ -1,4 +1,4 @@
-name: Build RSDKv5 iOS
+name: Build RSDKv5 iOS (Ultimate Plus + External Mods + BGM Fix)
 
 on:
   workflow_dispatch:
@@ -20,38 +20,62 @@ jobs:
           repository: "RSDKModding/Sonic-Mania-Decompilation"
           path: "Sonic-Mania-Decompilation"
 
-      - name: Patch DevMenu, Controller 1P, Resizable Window, Mod Path & Plus DLC
+      - name: Ultimate Patch (Plus DLC + External Mods + Audio + Pad 1P + DevMenu)
         run: |
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
-          
-          # 1. 모드 경로를 아이패드 파일 앱(userFilePath/mods)으로 고정
+
+          # 1. 외부 모드 경로(Documents/mods) 완전 강제 개방 패치
           python3 -c '
-          p = "RSDKv5/RSDK/Core/ModAPI.cpp"
-          with open(p, "r") as f:
-              s = f.read()
-          target = "void Mod::InitMods()"
-          if target in s:
-              s = s.replace(target + "\n{", target + "\n{\n    modPath = fs::path(userFilePath) / \"mods\";\n    fs::create_directories(modPath);")
-          with open(p, "w") as f:
-              f.write(s)
+          import glob, re
+
+          for p in glob.glob("RSDKv5/**/*.*", recursive=True):
+              if not p.endswith((".cpp", ".mm", ".m", ".h", ".hpp")):
+                  continue
+              with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                  s = f.read()
+              orig = s
+
+              s = s.replace("dataPath + \"mods\"", "userFilePath + \"mods\"")
+              s = s.replace("dataPath + \"/mods\"", "userFilePath + \"/mods\"")
+              s = s.replace("fs::path(dataPath) / \"mods\"", "fs::path(userFilePath) / \"mods\"")
+              s = s.replace("[[NSBundle mainBundle] resourcePath]", "NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject")
+
+              if "ModAPI.cpp" in p:
+                  s = re.sub(
+                      r"(void\s+Mod::InitMods\s*\([^)]*\)\s*\{)",
+                      r"\1\n    std::string extModDir = std::string(userFilePath) + \"mods/\";\n    fs::create_directories(extModDir);\n    modPath = extModDir;\n",
+                      s
+                  )
+                  s = re.sub(r"modPath\s*=\s*[^;]*dataPath[^;]*;", "modPath = std::string(userFilePath) + \"mods/\";", s)
+                  s = re.sub(r"modPath\s*=\s*[^;]*Bundle[^;]*;", "modPath = std::string(userFilePath) + \"mods/\";", s)
+
+              if s != orig:
+                  print(f"[ExternalModPatch] Patched: {p}")
+                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
+                      f.write(s)
           '
 
-          # 2. Dev Menu 기본값을 항상 활성화(true)로 설정
+          # 2. Dev Menu 및 BGM 스트리밍 기본값을 항상 활성화로 설정
           python3 -c '
           import glob
           for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True):
               with open(p, "r", encoding="utf-8", errors="ignore") as f:
                   s = f.read()
+              orig = s
               if "devMenu" in s:
                   s = s.replace("devMenu = false;", "devMenu = true;")
                   s = s.replace("devMenu = 0;", "devMenu = 1;")
-                  with open(p, "w", encoding="utf-8") as f:
+              if "streamsEnabled" in s:
+                  s = s.replace("streamsEnabled = false;", "streamsEnabled = true;")
+                  s = s.replace("streamsEnabled = 0;", "streamsEnabled = 1;")
+              if s != orig:
+                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
                       f.write(s)
           '
 
-          # 3. 기본 키보드 매핑 초기값만 0x0으로 설정
+          # 3. 기본 키보드 매핑 초기값만 0x0으로 설정 (패드 충돌 방지)
           python3 -c '
           import glob, re
           for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True):
@@ -59,11 +83,11 @@ jobs:
                   s = f.read()
               if "SDL_SCANCODE_" in s and "case SDL_SCANCODE_" not in s:
                   s = re.sub(r"\bSDL_SCANCODE_[A-Z0-9_]+\b", "0x0", s)
-                  with open(p, "w", encoding="utf-8") as f:
+                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
                       f.write(s)
           '
 
-          # 4. 아이패드 가속도계(기울기 센서)가 1P 조이스틱으로 잡히는 현상 차단 -> 엑박 패드 무조건 1P 고정
+          # 4. 아이패드 가속도계(기울기 센서) 조이스틱 인식 차단 -> 엑박 패드 무조건 1P 고정
           python3 -c '
           import glob
           for p in glob.glob("RSDKv5/RSDK/Input/**/*.cpp", recursive=True) + glob.glob("dependencies/ios/**/*.cpp", recursive=True):
@@ -72,11 +96,11 @@ jobs:
               if "SDL_InitSubSystem" in s:
                   hints = "SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, \"0\"); "
                   s = s.replace("SDL_InitSubSystem(", hints + "SDL_InitSubSystem(")
-                  with open(p, "w", encoding="utf-8") as f:
+                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
                       f.write(s)
           '
 
-          # 5. 창 크기 자유 조절(SDL_WINDOW_RESIZABLE) 허용 및 전체화면 강제 고정 해제
+          # 5. 창 크기 자유 조절(SDL_WINDOW_RESIZABLE) 허용
           python3 -c '
           import glob
           for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True):
@@ -86,11 +110,11 @@ jobs:
                   s = s.replace("SDL_WINDOW_FULLSCREEN_DESKTOP", "SDL_WINDOW_RESIZABLE")
                   s = s.replace("SDL_WINDOW_FULLSCREEN", "SDL_WINDOW_RESIZABLE")
                   s = s.replace("SDL_WINDOW_SHOWN", "SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE")
-                  with open(p, "w", encoding="utf-8") as f:
+                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
                       f.write(s)
           '
 
-          # 6. 컨트롤러 프로파일 + 파일 앱 공유 권한 + 스테이지 매니저/창 크기 자유 조절 Info.plist
+          # 6. Info.plist 설정 (아이패드 파일 앱 전체 공유 및 컨트롤러 프로파일 활성화)
           cat << 'EOF' > RSDKv5/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
@@ -151,22 +175,35 @@ jobs:
           </plist>
           EOF
 
-          # 7. 소닉 매니아 플러스(Encore DLC) 기본 활성화 패치
+          # 7. 엔진(RSDKv5)과 게임(SonicMania) 양쪽의 모든 플러스 DLC 체크를 100% 강제 활성화
           python3 -c '
           import glob, re
-          for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True) + glob.glob("Sonic-Mania-Decompilation/**/*.cpp", recursive=True):
+          patched = 0
+          for p in glob.glob("RSDKv5/**/*.*", recursive=True) + glob.glob("Sonic-Mania-Decompilation/**/*.*", recursive=True):
+              if not p.endswith((".cpp", ".c", ".h", ".hpp")):
+                  continue
               with open(p, "r", encoding="utf-8", errors="ignore") as f:
                   s = f.read()
               orig = s
+              s = re.sub(r"#if\s+MANIA_USE_PLUS.*", "#if 1", s)
+              s = re.sub(r"#ifdef\s+MANIA_USE_PLUS\b", "#if 1", s)
+              s = re.sub(r"#ifndef\s+MANIA_USE_PLUS\b", "#if 0", s)
+              s = re.sub(r"#if\s+!MANIA_USE_PLUS\b", "#if 0", s)
+              s = re.sub(r"#if\s+MANIA_FIRST_RELEASE.*", "#if 0", s)
+              s = s.replace("#define MANIA_USE_PLUS 0", "#define MANIA_USE_PLUS 1")
+              s = s.replace("#define MANIA_FIRST_RELEASE 1", "#define MANIA_FIRST_RELEASE 0")
               s = s.replace("dlcEnabled = false;", "dlcEnabled = true;")
               s = s.replace("dlcEnabled = 0;", "dlcEnabled = 1;")
-              s = re.sub(r"bool32\s+CheckDLC\s*\([^)]*\)\s*\{[^}]*\}", "bool32 CheckDLC(int32 id) { return true; }", s)
+              s = s.replace("API.CheckDLC(DLC_PLUS)", "true")
+              s = s.replace("CheckDLC(DLC_PLUS)", "true")
               if s != orig:
-                  with open(p, "w", encoding="utf-8") as f:
+                  patched += 1
+                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
                       f.write(s)
+          print(f"Total Plus-patched files: {patched}")
           '
 
-      - name: Build RSDKv5 Engine (Revision 3 + Plus DLC)
+      - name: Build RSDKv5 Engine (Revision 3 + Plus DLC + External Mods + BGM)
         run: |
           xcodebuild -project RSDKv5.xcodeproj \
             -scheme RSDKv5 \
@@ -174,24 +211,14 @@ jobs:
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 MANIA_FIRST_RELEASE=0' \
+            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 MANIA_FIRST_RELEASE=0 RETRO_USE_STB_VORBIS=1' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             CONFIGURATION_BUILD_DIR="$PWD/build_out"
 
-      - name: Package IPA
+      - name: Package IPA (Auto Rename Game.dylib to SonicMania)
         run: |
           mkdir -p Payload
           cp -r build_out/RSDKv5.app Payload/
           mkdir -p Payload/RSDKv5.app/Frameworks
-          find build_out -maxdepth 2 -name "*.framework" -exec cp -r {} Payload/RSDKv5.app/Frameworks/ \;
-          # 가상 터치(1P 슬롯 강탈 원인) 제외
-          rm -rf Payload/RSDKv5.app/Frameworks/ManiaTouchControls.framework
-          zip -r RSDKv5-iOS.ipa Payload
-
-      - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: RSDKv5-iOS-IPA
-          path: RSDKv5-iOS.ipa
