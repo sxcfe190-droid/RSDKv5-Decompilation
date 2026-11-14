@@ -1,4 +1,4 @@
-name: Print SDL2InputDevice Source
+name: Inspect RSDK DrawText and UISaveSlot
 
 on:
   workflow_dispatch:
@@ -12,6 +12,6 @@ jobs:
           repository: WamWooWam/RSDKv5-Decompilation
           ref: ios
 
-      - name: Print SDL2InputDevice.cpp
+      - name: Print RSDK Draw Functions
         run: |
-          cat RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp
+          grep -rn -C 5 "DrawRect\|DrawText\|LoadFont\|SetSpriteString" RSDKv5/RSDK/Core/ModAPI.hpp
