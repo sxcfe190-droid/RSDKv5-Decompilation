@@ -31,28 +31,22 @@ jobs:
           with open("RSDKv5/RSDK/Dev/Debug.cpp", "w", encoding="utf-8") as f:
               f.write(s)
 
+          # 1. SDL2InputDevice.cpp: A/B/X/Y=점프(KEYMASK_A), 가운데 왼쪽=Select, 가운데 오른쪽=Start, LB=Pause(keyStart), RB=BumperR
           with open("RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp", "r", encoding="utf-8") as f:
               s = f.read()
-          old_block = """    int32 buttonMap[] = {
-              SDL_CONTROLLER_BUTTON_DPAD_UP,   SDL_CONTROLLER_BUTTON_DPAD_DOWN,  SDL_CONTROLLER_BUTTON_DPAD_LEFT,    SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
-              SDL_CONTROLLER_BUTTON_A,         SDL_CONTROLLER_BUTTON_B,          SDL_CONTROLLER_BUTTON_INVALID,      SDL_CONTROLLER_BUTTON_X,
-              SDL_CONTROLLER_BUTTON_Y,         SDL_CONTROLLER_BUTTON_INVALID,    SDL_CONTROLLER_BUTTON_START,        SDL_CONTROLLER_BUTTON_BACK,
-              SDL_CONTROLLER_BUTTON_LEFTSTICK, SDL_CONTROLLER_BUTTON_RIGHTSTICK, SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
-          };
-
-          int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT,  KEYMASK_RIGHT,  KEYMASK_A,      KEYMASK_B,      KEYMASK_C,       KEYMASK_X,
-                               KEYMASK_Y,  KEYMASK_Z,    KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };"""
-          new_block = """    int32 buttonMap[] = {
-              SDL_CONTROLLER_BUTTON_DPAD_UP,      SDL_CONTROLLER_BUTTON_DPAD_DOWN,     SDL_CONTROLLER_BUTTON_DPAD_LEFT,    SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
-              SDL_CONTROLLER_BUTTON_A,            SDL_CONTROLLER_BUTTON_B,             SDL_CONTROLLER_BUTTON_X,            SDL_CONTROLLER_BUTTON_Y,
-              SDL_CONTROLLER_BUTTON_INVALID,      SDL_CONTROLLER_BUTTON_INVALID,       SDL_CONTROLLER_BUTTON_START,        SDL_CONTROLLER_BUTTON_BACK,
-              SDL_CONTROLLER_BUTTON_LEFTSTICK,    SDL_CONTROLLER_BUTTON_RIGHTSTICK,    SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
-          };
-
-          int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT,  KEYMASK_RIGHT,  KEYMASK_A,      KEYMASK_A,      KEYMASK_A,       KEYMASK_A,
-                               KEYMASK_Y,  KEYMASK_Z,    KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };"""
-          assert old_block in s, "buttonMap/keyMasks block not found!"
-          s = s.replace(old_block, new_block)
+          s, n1 = re.subn(
+              r"int32\s+buttonMap\[\]\s*=\s*\{[^;]+\};",
+              "int32 buttonMap[] = { SDL_CONTROLLER_BUTTON_DPAD_UP, SDL_CONTROLLER_BUTTON_DPAD_DOWN, SDL_CONTROLLER_BUTTON_DPAD_LEFT, SDL_CONTROLLER_BUTTON_DPAD_RIGHT, SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_START, SDL_CONTROLLER_BUTTON_BACK, SDL_CONTROLLER_BUTTON_LEFTSTICK, SDL_CONTROLLER_BUTTON_RIGHTSTICK, SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER };",
+              s,
+              count=1
+          )
+          s, n2 = re.subn(
+              r"int32\s+keyMasks\[\]\s*=\s*\{[^;]+\};",
+              "int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT, KEYMASK_RIGHT, KEYMASK_A, KEYMASK_A, KEYMASK_A, KEYMASK_A, KEYMASK_Y, KEYMASK_Z, KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };",
+              s,
+              count=1
+          )
+          assert n1 == 1 and n2 == 1, f"Failed to patch buttonMap/keyMasks: n1={n1}, n2={n2}"
           s = s.replace(
               "controller[controllerID].keyStart.press |= this->stateStart;",
               "controller[controllerID].keyStart.press |= (this->stateStart || this->stateBumper_L);"
@@ -60,6 +54,7 @@ jobs:
           with open("RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp", "w", encoding="utf-8") as f:
               f.write(s)
 
+          # 2. RetroEngine.cpp: Dev Menu는 RB(BumperR)로 열리도록 분리
           with open("RSDKv5/RSDK/Core/RetroEngine.cpp", "r", encoding="utf-8") as f:
               s = f.read()
           assert "if (controller[CONT_P1].keySelect.press)" in s, "keySelect.press not found!"
