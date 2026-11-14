@@ -267,7 +267,8 @@ jobs:
           bool32 UISaveSlot_State_Selected_Hook(bool32 skipped);
           bool32 UISaveSlot_SetupButtonElements_Hook(bool32 skipped);
           #endif
-          EOF          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.c
+          EOF
+          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.c
           #include "UISaveSlot.h"
           ObjectUISaveSlot *UISaveSlot;
           bool32 editingSave = false; int32 editSlot = 0; int32 editSelection = 0;
@@ -393,7 +394,6 @@ jobs:
               assert old in s, f"Missing {old} in {path}"
               open(path, "w").write(s.replace(old, new))
           '
-
           cat << 'EOF' > SaveEditorMod/dllmain.c
           #include "GameAPI/Game.h"
           #include "Objects/UISaveSlot.h"
