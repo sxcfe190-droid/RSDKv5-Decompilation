@@ -1,37 +1,15 @@
-name: Inspect Game Pause & DevMenu Keys
+name: Inspect SDL2InputDevice Full
 on:
   workflow_dispatch:
 jobs:
-  inspect-keys:
+  inspect-sdl:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
           repository: "WamWooWam/RSDKv5-Decompilation"
           ref: "ios"
-          submodules: recursive
 
-      - name: Print Pause & DevMenu Key Logic
+      - name: Print SDL2InputDevice.cpp
         run: |
-          python3 - << 'EOF'
-          import glob
-
-          targets = ["OpenDevMenu", "devMenu", "PauseMenu", "keySelect", "keyStart", "keyX", "keyB"]
-
-          for path in sorted(glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True) + glob.glob("Game/**/*.cpp", recursive=True)):
-              with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                  lines = f.readlines()
-              
-              hits = []
-              for i, line in enumerate(lines):
-                  if any(t in line for t in ["OpenDevMenu", "PauseMenu", "->keySelect", "->keyStart", "->keyX", "->keyB", "keySelect.", "keyStart."]):
-                      start = max(0, i - 4)
-                      end = min(len(lines), i + 12)
-                      hits.append((i + 1, "".join(f"{ln+1}: {lines[ln]}" for ln in range(start, end))))
-              
-              if hits:
-                  print(f"\n==================== FILE: {path} ====================")
-                  for line_no, block in hits[:8]:
-                      print(f"--- Match around line {line_no} ---")
-                      print(block)
-          EOF
+          nl -ba RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp | sed -n '1,160p'
