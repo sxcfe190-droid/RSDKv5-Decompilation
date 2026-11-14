@@ -1,17 +1,473 @@
-name: Inspect LoadMod Body
+name: Build RSDKv5 iOS True Final
 
 on:
   workflow_dispatch:
 
 jobs:
-  inspect:
+  build-ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
           repository: WamWooWam/RSDKv5-Decompilation
           ref: ios
+          submodules: recursive
 
-      - name: Print ModAPI.cpp 551-820
+      - name: Apply Verified Patches
         run: |
-          nl -ba RSDKv5/RSDK/Core/ModAPI.cpp | sed -n '551,820p'
+          sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
+          cat << 'EOF' > patch.py
+          import glob, re
+
+          with open("RSDKv5/RSDK/Core/ModAPI.cpp", "r", encoding="utf-8") as f:
+              s = f.read()
+          s = s.replace('sprintf(customUserFileDir, "%smods/%s/", SKU::appFileDir', 'sprintf(customUserFileDir, "%smods/%s/", SKU::userFileDir')
+          s = s.replace('sprintf_s(modBuf, sizeof(modBuf), "%smods", SKU::appFileDir);', 'sprintf_s(modBuf, sizeof(modBuf), "%smods", SKU::userFileDir); std::filesystem::create_directories(modBuf);')
+          with open("RSDKv5/RSDK/Core/ModAPI.cpp", "w", encoding="utf-8") as f:
+              f.write(s)
+
+          with open("RSDKv5/RSDK/Core/Link.hpp", "r", encoding="utf-8") as f:
+              s = f.read()
+          old_dl = 'ret  = (Handle)dlopen(path.c_str(), RTLD_LOCAL | RTLD_LAZY);'
+          new_dl = 'ret  = (Handle)dlopen(path.c_str(), RTLD_LOCAL | RTLD_LAZY);\n        if (!ret) ret = (Handle)dlopen(("@rpath/" + path).c_str(), RTLD_LOCAL | RTLD_LAZY);'
+          assert old_dl in s, "dlopen not found in Link.hpp"
+          s = s.replace(old_dl, new_dl, 1)
+          with open("RSDKv5/RSDK/Core/Link.hpp", "w", encoding="utf-8") as f:
+              f.write(s)
+
+          with open("RSDKv5/RSDK/Dev/Debug.cpp", "r", encoding="utf-8") as f:
+              s = f.read()
+          s = s.replace("if (modList.size() != 0)", "if (true)")
+          with open("RSDKv5/RSDK/Dev/Debug.cpp", "w", encoding="utf-8") as f:
+              f.write(s)
+
+          with open("RSDKv5/RSDK/User/Core/UserCore.cpp", "r", encoding="utf-8") as f:
+              s = f.read()
+          s, n_vk = re.subn(
+              r"\{ VK_UP,[^}]+\},\s*\{ VK_NUMPAD8,[^}]+\},",
+              "{ KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING },\n        { KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING, KEYMAP_NO_MAPPING },",
+              s,
+              count=1
+          )
+          assert n_vk == 1, f"Failed to patch defaultKeyMaps VK_*: n_vk={n_vk}"
+          with open("RSDKv5/RSDK/User/Core/UserCore.cpp", "w", encoding="utf-8") as f:
+              f.write(s)
+          with open("RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp", "r", encoding="utf-8") as f:
+              s = f.read()
+          s, n1 = re.subn(
+              r"int32\s+buttonMap\[\]\s*=\s*\{[^;]+\};",
+              "int32 buttonMap[] = { SDL_CONTROLLER_BUTTON_DPAD_UP, SDL_CONTROLLER_BUTTON_DPAD_DOWN, SDL_CONTROLLER_BUTTON_DPAD_LEFT, SDL_CONTROLLER_BUTTON_DPAD_RIGHT, SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, SDL_CONTROLLER_BUTTON_START, SDL_CONTROLLER_BUTTON_BACK, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER };",
+              s,
+              count=1
+          )
+          s, n2 = re.subn(
+              r"int32\s+keyMasks\[\]\s*=\s*\{[^;]+\};",
+              "int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT, KEYMASK_RIGHT, KEYMASK_A, KEYMASK_B, KEYMASK_C, KEYMASK_X, KEYMASK_Y, KEYMASK_Z, KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };",
+              s,
+              count=1
+          )
+          assert n1 == 1 and n2 == 1, f"Failed to patch buttonMap/keyMasks: n1={n1}, n2={n2}"
+          s = s.replace("device->swapABXY = true;", "device->swapABXY = false;")
+          with open("RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp", "w", encoding="utf-8") as f:
+              f.write(s)
+
+          with open("RSDKv5/RSDK/Graphics/SDL2/SDL2RenderDevice.cpp", "r", encoding="utf-8") as f:
+              s = f.read()
+          assert "case SDL_SCANCODE_ESCAPE:" in s, "SDL_SCANCODE_ESCAPE not found in SDL2RenderDevice.cpp!"
+          s = s.replace("case SDL_SCANCODE_ESCAPE:\n                        if (engine.devMenu) {", "case SDL_SCANCODE_ESCAPE:\n                        if (false && engine.devMenu) {")
+          assert "if (false && engine.devMenu)" in s, "Failed to disable ESCAPE OpenDevMenu in SDL2RenderDevice.cpp!"
+          with open("RSDKv5/RSDK/Graphics/SDL2/SDL2RenderDevice.cpp", "w", encoding="utf-8") as f:
+              f.write(s)
+
+          with open("RSDKv5/RSDK/Core/RetroEngine.cpp", "r", encoding="utf-8") as f:
+              s = f.read()
+          target = "if (controller[CONT_P1].keySelect.press)"
+          replacement = "bool32 anyJump = controller[CONT_ANY].keyA.down || controller[CONT_ANY].keyB.down || controller[CONT_ANY].keyC.down || controller[CONT_ANY].keyX.down || controller[CONT_ANY].keyY.down || controller[CONT_ANY].keyA.press || controller[CONT_ANY].keyB.press || controller[CONT_ANY].keyC.press || controller[CONT_ANY].keyX.press || controller[CONT_ANY].keyY.press;\n    if (!anyJump && (controller[CONT_P1].keySelect.press || controller[CONT_ANY].keySelect.press))"
+          assert target in s, "keySelect.press check missing in RetroEngine.cpp!"
+          s = s.replace(target, replacement, 1)
+          assert replacement in s, "RetroEngine.cpp replacement failed!"
+          with open("RSDKv5/RSDK/Core/RetroEngine.cpp", "w", encoding="utf-8") as f:
+              f.write(s)
+
+          with open("dependencies/ios/SDL/src/audio/coreaudio/SDL_coreaudio.m", "r", encoding="utf-8") as f:
+              s = f.read()
+          assert "NSString *category = AVAudioSessionCategoryPlayback;" in s, "SDL_coreaudio.m default category not found!"
+          assert "options |= AVAudioSessionCategoryOptionDuckOthers;" in s, "SDL_coreaudio.m DuckOthers not found!"
+          s = s.replace("NSString *category = AVAudioSessionCategoryPlayback;", "NSString *category = AVAudioSessionCategoryAmbient;", 1)
+          s = s.replace("options |= AVAudioSessionCategoryOptionDuckOthers;", "// options |= AVAudioSessionCategoryOptionDuckOthers;", 1)
+          with open("dependencies/ios/SDL/src/audio/coreaudio/SDL_coreaudio.m", "w", encoding="utf-8") as f:
+              f.write(s)
+          with open("RSDKv5/RSDK/Audio/SDL2/SDL2AudioDevice.cpp", "r", encoding="utf-8") as f:
+              s = f.read()
+          assert "if ((device = SDL_OpenAudioDevice(" in s, "if ((device = SDL_OpenAudioDevice( not found in SDL2AudioDevice.cpp!"
+          s = s.replace("if ((device = SDL_OpenAudioDevice(", 'SDL_SetHint(SDL_HINT_AUDIO_CATEGORY, "AVAudioSessionCategoryAmbient");\n    if ((device = SDL_OpenAudioDevice(', 1)
+          with open("RSDKv5/RSDK/Audio/SDL2/SDL2AudioDevice.cpp", "w", encoding="utf-8") as f:
+              f.write(s)
+
+          for p in glob.glob("RSDKv5/RSDK/**/*.cpp", recursive=True) + glob.glob("Game/**/*.c", recursive=True) + glob.glob("Game/**/*.cpp", recursive=True) + glob.glob("Game/**/*.h", recursive=True):
+              with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                  s = f.read()
+              o = s
+              s = s.replace("devMenu = false;", "devMenu = true;").replace("devMenu = 0;", "devMenu = 1;")
+              s = s.replace("streamsEnabled = false;", "streamsEnabled = true;").replace("streamsEnabled = 0;", "streamsEnabled = 1;")
+              if "SDL_CreateWindow(" in s:
+                  s = s.replace("SDL_WINDOW_FULLSCREEN_DESKTOP", "SDL_WINDOW_RESIZABLE").replace("SDL_WINDOW_FULLSCREEN", "SDL_WINDOW_RESIZABLE").replace("SDL_WINDOW_SHOWN", "SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE")
+              if "SDL_InitSubSystem" in s:
+                  s = s.replace("SDL_InitSubSystem(", 'SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0"); SDL_InitSubSystem(')
+              s = s.replace("#define MANIA_USE_PLUS 0", "#define MANIA_USE_PLUS 1").replace("dlcEnabled = false;", "dlcEnabled = true;").replace("dlcEnabled = 0;", "dlcEnabled = 1;").replace("API.CheckDLC(DLC_PLUS)", "true").replace("CheckDLC(DLC_PLUS)", "true")
+              if s != o:
+                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
+                      f.write(s)
+          EOF
+          python3 patch.py
+
+          cat << 'EOF' > RSDKv5/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
+          <plist version="1.0"><dict>
+            <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+            <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+            <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>1.3.2</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>LSRequiresIPhoneOS</key><true/>
+            <key>UIRequiresFullScreen</key><false/>
+            <key>UIFileSharingEnabled</key><true/>
+            <key>LSSupportsOpeningDocumentsInPlace</key><true/>
+            <key>GCSupportedGameControllers</key><array><dict><key>ProfileName</key><string>ExtendedGamepad</string></dict></array>
+            <key>GCSupportsControllerUserInteraction</key><true/>
+            <key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
+            <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
+            <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
+          </dict></plist>
+          EOF
+
+      - name: Build RSDKv5 and SaveEditor Framework
+        run: |
+          xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 -configuration Release -sdk iphoneos -destination "generic/platform=iOS" IPHONEOS_DEPLOYMENT_TARGET=13.0 GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_USE_MOD_LOADER=1 RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 RETRO_USE_ORIGINAL_CODE=0' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR="$PWD/build_out"
+          mkdir -p SaveEditorMod/Objects
+          cat << 'EOF' > SaveEditorMod/Objects/Misc.h
+          #ifndef OBJ_MISC_H
+          #define OBJ_MISC_H
+          #include "GameAPI/Game.h"
+          typedef enum { PLAYMODE_NONE = 0, PLAYMODE_REGULAR = 1, PLAYMODE_ENCORE = 2, PLAYMODE_TIMEATTACK = 4, PLAYMODE_COMPETITION = 8 } PlayModes;
+          typedef enum { ZONE_GHZ = 0, ZONE_CPZ = 1, ZONE_SPZ = 2, ZONE_FBZ = 3, ZONE_PGZ = 4, ZONE_SSZ = 5, ZONE_HCZ = 6, ZONE_MSZ = 7, ZONE_OOZ = 8, ZONE_LRZ = 9, ZONE_MMZ = 10, ZONE_TMZ = 11, ZONE_ERZ = 12, ZONE_MAX = 13 } ZoneIDs;
+          #endif
+          EOF
+
+          cat << 'EOF' > SaveEditorMod/Objects/GameProgress.h
+          #ifndef OBJ_GAMEPROGRESS_H
+          #define OBJ_GAMEPROGRESS_H
+          #include "GameAPI/Game.h"
+          typedef enum { MEDAL_SILVER = 1, MEDAL_GOLD = 2 } MedalTypes;
+          typedef struct {
+              uint8 goldMedals; uint8 silverMedals; uint8 field_2; uint8 field_3;
+              uint32 allGoldMedals; uint32 allSilverMedals; uint8 unlockedStages;
+              uint8 emeraldObtained; uint8 unreadNotifs;
+          } GameProgress;
+          #endif
+          EOF
+
+          cat << 'EOF' > SaveEditorMod/Objects/SaveGame.h
+          #ifndef OBJ_SAVEGAME_H
+          #define OBJ_SAVEGAME_H
+          #include "GameAPI/Game.h"
+          typedef enum { SAVEFILE_EMPTY = 0, SAVEFILE_REGULAR = 1, SAVEFILE_COMPLETE = 2 } SaveStates;
+          typedef struct {
+              uint8 saveState; uint8 characterID; uint8 zoneID; uint8 lives;
+              uint8 score; uint8 score1UP; uint8 chaosEmeralds; uint8 continues;
+              uint8 characterFlags; uint8 stock; uint16 playerID; uint16 filter;
+              int32 collectedSpecialRings; int32 nextSpecialRing; int32 scoreBonus; int32 padding;
+          } SaveRAM;
+          typedef struct { SaveRAM slots; uint8 padding[0x1000]; } SaveDataFile;
+          #endif
+          EOF
+
+          cat << 'EOF' > SaveEditorMod/Objects/UIMedallionPanel.h
+          #ifndef OBJ_UIMEDALLIONPANEL_H
+          #define OBJ_UIMEDALLIONPANEL_H
+          #include "GameAPI/Game.h"
+          #include "GameProgress.h"
+          typedef struct { RSDK_OBJECT uint16 aniFrames; } ObjectUIMedallionPanel;
+          typedef struct {
+              RSDK_ENTITY
+              StateMachine(state);
+              int32 timer; uint8 column; uint8 row; uint8 medal; uint8 panelX; uint8 panelY; Animator animator;
+          } EntityUIMedallionPanel;
+          extern ObjectUIMedallionPanel *UIMedallionPanel;
+          bool32 UIMedallionPanel_State_Selected_Hook(bool32 skipped);
+          #endif
+          EOF
+          cat << 'EOF' > SaveEditorMod/Objects/UIMedallionPanel.c
+          #include "UIMedallionPanel.h"
+          #include "Misc.h"
+          ObjectUIMedallionPanel *UIMedallionPanel;
+          bool32 UIMedallionPanel_State_Selected_Hook(bool32 skipped)
+          {
+              RSDK_THIS(UIMedallionPanel);
+              bool32 touched = false;
+              if (TouchInfo->count) {
+                  int32 sizeX = ScreenInfo[SceneInfo->currentScreenID].size.x;
+                  int32 sizeY = ScreenInfo[SceneInfo->currentScreenID].size.y;
+                  for (int32 t = 0; t < TouchInfo->count; ++t) {
+                      int32 tx = (int32)(TouchInfo->x[t] * sizeX);
+                      int32 ty = (int32)(TouchInfo->y[t] * sizeY);
+                      if (TouchInfo->down[t] && (tx >= 0 && ty >= sizeY - 32 && tx <= 32 && ty <= sizeY)) { touched = true; break; }
+                  }
+              }
+              static bool32 prevTouch = false;
+              bool32 touchPress = touched && !prevTouch;
+              prevTouch = touched;
+              if (TriggerInfoR[CONT_ANY].keyBumper.press || ControllerInfo[CONT_ANY].keyZ.press || touchPress) {
+                  GameProgress *progress = (GameProgress *)Mod.GetGlobals();
+                  uint8 id = self->column + 8 * self->row;
+                  switch (self->medal) {
+                      case 0:
+                          self->medal = MEDAL_SILVER; progress->silverMedals++; progress->unlockedStages[id] = true;
+                          progress->allSilverMedals |= (1 << id); progress->allGoldMedals &= ~(1 << id); break;
+                      case MEDAL_SILVER:
+                          self->medal = MEDAL_GOLD; progress->silverMedals--; progress->goldMedals++; progress->unlockedStages[id] = true;
+                          progress->allSilverMedals |= (1 << id); progress->allGoldMedals |= (1 << id); break;
+                      case MEDAL_GOLD:
+                          self->medal = 0; progress->goldMedals--; progress->unlockedStages[id] = false;
+                          progress->allSilverMedals &= ~(1 << id); progress->allGoldMedals &= ~(1 << id); break;
+                      default: break;
+                  }
+                  RSDK.SetSpriteAnimation(UIMedallionPanel->aniFrames, 5, &self->animator, true, self->medal);
+                  RSDK.PlaySfx(RSDK.GetSfx("Stage/SpecialRing.wav"), false, 255);
+              }
+              return false;
+          }
+          EOF
+
+          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.h
+          #ifndef OBJ_UISAVESLOT_H
+          #define OBJ_UISAVESLOT_H
+          #include "GameAPI/Game.h"
+          #include "SaveGame.h"
+          #include "Misc.h"
+          typedef enum { UISAVESLOT_REGULAR = 0, UISAVESLOT_NOSAVE = 1 } UISaveSlotTypes;
+          typedef struct { RSDK_OBJECT uint16 aniFrames; } ObjectUISaveSlot;
+          typedef struct {
+              RSDK_ENTITY
+              StateMachine(state); StateMachine(stateDraw);
+              int32 type; int32 slotID; int32 listID; int32 frameID;
+              int32 saveZoneID; int32 saveLives; int32 saveContinues; int32 saveEmeralds;
+              bool32 isNewSave; bool32 isEncoreSave; bool32 isSelected; bool32 currentlySelected;
+              int32 dpadAlpha; int32 slotNumAlpha; int32 zoneNameAlpha; int32 buttonID;
+              Vector2 startPos; Vector2 size; int32 textBounceOffset; int32 textBounceVel;
+              int32 unused1; int32 unused2; int32 unused3; int32 unused4;
+              Animator uiAnimator; Animator playersAnimator; Animator shadowsAnimator;
+              Animator livesAnimator; Animator continuesAnimator; Animator emeraldsAnimator;
+              Animator zoneNameAnimator; Animator textAnimator; Animator dpadAnimator;
+              int32 unused5; void *parent; String text; int32 fxRuby; int32 unused6; int32 unused7;
+          } EntityUISaveSlot;
+          extern ObjectUISaveSlot *UISaveSlot;
+          bool32 UISaveSlot_State_Selected_Hook(bool32 skipped);
+          bool32 UISaveSlot_SetupButtonElements_Hook(bool32 skipped);
+          #endif
+          EOF
+          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.c
+          #include "UISaveSlot.h"
+          ObjectUISaveSlot *UISaveSlot;
+          bool32 editingSave = false; int32 editSlot = 0; int32 editSelection = 0;
+          SaveDataFile saveDataCache;
+          void SaveData_SaveCB(int32 status) { (void)status; }
+          void SaveData_LoadCB(int32 status) { (void)status; }
+          bool32 UISaveSlot_State_Selected_Hook(bool32 skipped) {
+              RSDK_THIS(UISaveSlot);
+              if (self->type == UISAVESLOT_REGULAR && !self->isNewSave) {
+                  bool32 touched = false;
+                  if (TouchInfo->count) {
+                      int32 sx = ScreenInfo[SceneInfo->currentScreenID].size.x;
+                      int32 sy = ScreenInfo[SceneInfo->currentScreenID].size.y;
+                      for (int32 t = 0; t < TouchInfo->count; ++t) {
+                          int32 tx = (int32)(TouchInfo->x[t] * sx);
+                          int32 ty = (int32)(TouchInfo->y[t] * sy);
+                          if (TouchInfo->down[t] && tx >= 0 && ty >= sy - 32 && tx <= 32 && ty <= sy) { touched = true; break; }
+                      }
+                  }
+                  static bool32 prevTouch = false;
+                  bool32 touchPress = touched && !prevTouch; prevTouch = touched;
+                  bool32 rbPress = TriggerInfoR[CONT_ANY].keyBumper.press || ControllerInfo[CONT_ANY].keyZ.press;
+                  if (!editingSave) {
+                      if (rbPress || touchPress) {
+                          API.LoadUserFile("SaveData.bin", &saveDataCache, sizeof(SaveDataFile), SaveData_LoadCB);
+                          editingSave = true; editSlot = self->slotID; editSelection = 0;
+                          RSDK.PlaySfx(RSDK.GetSfx("Global/MenuMove.wav"), false, 255); return true;
+                      }
+                  } else {
+                      SaveRAM *saveRAM = &saveDataCache.slots[self->slotID + (self->isEncoreSave ? 8 : 0)];
+                      if (ControllerInfo[CONT_ANY].keyB.press || rbPress || touchPress) {
+                          editingSave = false;
+                          API.SaveUserFile("SaveData.bin", &saveDataCache, sizeof(SaveDataFile), SaveData_SaveCB, false);
+                          RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBack.wav"), false, 255);
+                          return true;
+                      }
+                      if (ControllerInfo[CONT_ANY].keyLeft.press) {
+                          if (--editSelection < 0) editSelection = self->isEncoreSave ? 2 : 3;
+                          RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBleep.wav"), false, 255);
+                      } else if (ControllerInfo[CONT_ANY].keyRight.press) {
+                          if (++editSelection > (self->isEncoreSave ? 2 : 3)) editSelection = 0;
+                          RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBleep.wav"), false, 255);
+                      }
+                      int32 dir = ControllerInfo[CONT_ANY].keyUp.press ? 1 : (ControllerInfo[CONT_ANY].keyDown.press ? -1 : 0);
+                      if (dir) {
+                          if (!self->isEncoreSave) {
+                              if (editSelection == 0) {
+                                  uint8 m = API.CheckDLC(DLC_PLUS) ? 5 : 3;
+                                  if (dir > 0) { if (++saveRAM->characterID > m) saveRAM->characterID = 1; }
+                                  else { if (--saveRAM->characterID < 1) saveRAM->characterID = m; }
+                              } else if (editSelection == 1) {
+                                  int32 zm = (saveRAM->characterID == 1 || saveRAM->characterID == 4 || saveRAM->characterID == 5) ? ZONE_ERZ : ZONE_TMZ;
+                                  if (dir > 0) { if (++saveRAM->zoneID > zm) { saveRAM->zoneID = ZONE_GHZ; saveRAM->saveState = SAVEFILE_REGULAR; } else if (saveRAM->zoneID == zm) saveRAM->saveState = SAVEFILE_COMPLETE; }
+                                  else { if (saveRAM->zoneID == zm) { if (saveRAM->saveState == SAVEFILE_COMPLETE) saveRAM->saveState = SAVEFILE_REGULAR; else saveRAM->zoneID--; } else if (--saveRAM->zoneID >= ZONE_MAX) { saveRAM->zoneID = zm; saveRAM->saveState = SAVEFILE_COMPLETE; } }
+                                  self->saveZoneID = saveRAM->zoneID;
+                              } else if (editSelection == 2) {
+                                  int32 em = 0; for (int32 i = 0; i < 7; ++i) if (saveRAM->chaosEmeralds & (1 << i)) em++;
+                                  em += dir; if (em < 0) em = 7; else if (em > 7) em = 0;
+                                  saveRAM->chaosEmeralds = 0; for (int32 i = 0; i < em; ++i) saveRAM->chaosEmeralds |= (1 << i);
+                                  self->saveEmeralds = saveRAM->chaosEmeralds;
+                              } else if (editSelection == 3) {
+                                  saveRAM->lives += dir; if (saveRAM->lives < 1) saveRAM->lives = 99; else if (saveRAM->lives > 99) saveRAM->lives = 1;
+                                  self->saveLives = saveRAM->lives;
+                              }
+                          } else {
+                              if (editSelection == 0) {
+                                  int32 zm = ZONE_TMZ;
+                                  if (dir > 0) { if (++saveRAM->zoneID > zm) { saveRAM->zoneID = ZONE_GHZ; saveRAM->saveState = SAVEFILE_REGULAR; } else if (saveRAM->zoneID == zm) saveRAM->saveState = SAVEFILE_COMPLETE; }
+                                  else { if (saveRAM->zoneID == zm) { if (saveRAM->saveState == SAVEFILE_COMPLETE) saveRAM->saveState = SAVEFILE_REGULAR; else saveRAM->zoneID--; } else if (--saveRAM->zoneID >= ZONE_MAX) { saveRAM->zoneID = zm; saveRAM->saveState = SAVEFILE_COMPLETE; } }
+                                  self->saveZoneID = saveRAM->zoneID;
+                              } else if (editSelection == 1) {
+                                  int32 em = 0; for (int32 i = 0; i < 7; ++i) if (saveRAM->chaosEmeralds & (1 << i)) em++;
+                                  em += dir; if (em < 0) em = 7; else if (em > 7) em = 0;
+                                  saveRAM->chaosEmeralds = 0; for (int32 i = 0; i < em; ++i) saveRAM->chaosEmeralds |= (1 << i);
+                                  self->saveEmeralds = saveRAM->chaosEmeralds;
+                              } else if (editSelection == 2) {
+                                  uint8 lst = { saveRAM->playerID & 0xFF, (saveRAM->playerID >> 8) & 0xFF, saveRAM->stock };
+                                  uint8 ml = { 1, 2, 4 }; uint8 id = 0, cnt = 0;
+                                  for (int32 i = 0; i < 3; ++i) { if (lst[i] == ml[editSelection]) id = i; if (lst[i]) cnt++; }
+                                  uint8 nid = id + dir; if (nid >= cnt) nid = 0;
+                                  uint8 prv = lst[id]; lst[id] = lst[nid]; lst[nid] = prv;
+                                  saveRAM->playerID = (lst << 0) | (lst << 8); saveRAM->stock = lst;
+                              }
+                          }
+                          RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBleep.wav"), false, 255);
+                          if (saveRAM->saveState == SAVEFILE_COMPLETE) self->frameID = 14;
+                          else { self->frameID = self->saveZoneID + 1; if (self->isEncoreSave && self->saveZoneID >= ZONE_MSZ) self->frameID--; if (self->saveZoneID == ZONE_ERZ) self->frameID = 13; }
+                          UISaveSlot_SetupButtonElements_Hook(false);
+                      }
+                      return true;
+                  }
+              }
+              return false;
+          }
+          bool32 UISaveSlot_SetupButtonElements_Hook(bool32 skipped) {
+              RSDK_THIS(UISaveSlot);
+              if (self->type == UISAVESLOT_REGULAR && !self->isNewSave && editingSave) {
+                  SaveRAM *saveRAM = &saveDataCache.slots[self->slotID + (self->isEncoreSave ? 8 : 0)];
+                  RSDK.SetSpriteAnimation(UISaveSlot->aniFrames, 1, &self->playersAnimator, true, saveRAM->characterID);
+                  RSDK.SetSpriteAnimation(UISaveSlot->aniFrames, 2, &self->shadowsAnimator, true, saveRAM->characterID);
+                  int32 lives = 0;
+                  if (self->isEncoreSave) { if (saveRAM->playerID & 0xFF) lives++; if (saveRAM->playerID >> 8) lives++; for (int32 i = 0; i < 3; ++i) if ((saveRAM->stock >> i) & 1) lives++; }
+                  else lives = saveRAM->lives;
+                  self->saveLives = lives;
+                  RSDK.SetSpriteAnimation(UISaveSlot->aniFrames, 3, &self->livesAnimator, true, saveRAM->characterID - 1);
+                  RSDK.SetSpriteAnimation(UISaveSlot->aniFrames, 4, &self->continuesAnimator, true, saveRAM->characterID - 1);
+              }
+              return false;
+          }
+          EOF
+          python3 -c '
+          lb, rb = chr(91), chr(93)
+          reps = [
+              ("SaveEditorMod/Objects/GameProgress.h", "unlockedStages;", f"unlockedStages{lb}32{rb};"),
+              ("SaveEditorMod/Objects/SaveGame.h", "SaveRAM slots;", f"SaveRAM slots{lb}16{rb};"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "uint8 lst = {", f"uint8 lst{lb}3{rb} = {{"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "uint8 ml = {", f"uint8 ml{lb}3{rb} = {{"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "(lst << 0) | (lst << 8); saveRAM->stock = lst;", f"(lst{lb}0{rb} << 0) | (lst{lb}1{rb} << 8); saveRAM->stock = lst{lb}2{rb};"),
+          ]
+          for path, old, new in reps:
+              s = open(path).read()
+              assert old in s, f"Missing {old} in {path}"
+              open(path, "w").write(s.replace(old, new))
+          '
+          cat << 'EOF' > SaveEditorMod/dllmain.c
+          #include "GameAPI/Game.h"
+          #include "Objects/UISaveSlot.h"
+          #include "Objects/UIMedallionPanel.h"
+          #if RETRO_USE_MOD_LOADER
+          DLLExport ModVersionInfo modInfo = { RETRO_REVISION, GAME_VERSION, RETRO_MOD_LOADER_VER };
+          DLLExport bool32 LinkModLogic(EngineInfo *info, const char *id);
+          #endif
+          void InitModAPI(void)
+          {
+              MOD_REGISTER_OBJECT_HOOK(UISaveSlot);
+              MOD_REGISTER_OBJECT_HOOK(UIMedallionPanel);
+              Mod.RegisterStateHook(Mod.GetPublicFunction(NULL, "UISaveSlot_State_Selected"), UISaveSlot_State_Selected_Hook, true);
+              Mod.RegisterStateHook(Mod.GetPublicFunction(NULL, "UIMedallionPanel_State_Selected"), UIMedallionPanel_State_Selected_Hook, true);
+              Mod.RegisterStateHook(Mod.GetPublicFunction(NULL, "UISaveSlot_SetupButtonElements"), UISaveSlot_SetupButtonElements_Hook, false);
+          }
+          #if RETRO_USE_MOD_LOADER
+          bool32 LinkModLogic(EngineInfo *info, const char *id)
+          {
+          #if MANIA_USE_PLUS
+              LinkGameLogicDLL(info);
+          #else
+              LinkGameLogicDLL(*info);
+          #endif
+              globals = Mod.GetGlobals();
+              modID = id;
+              InitModAPI();
+              return true;
+          }
+          #endif
+          EOF
+
+          GH="github.com"
+          GAPI_REPO="RSDKModding/RSDKv5-GameAPI"
+          git clone --depth 1 "https://${GH}/${GAPI_REPO}.git" GameAPI_SDK
+
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          mkdir -p build_out/SaveEditor.framework
+          clang -arch arm64 -isysroot "$SDK_PATH" -miphoneos-version-min=13.0 \
+            -dynamiclib -install_name "@rpath/SaveEditor.framework/SaveEditor" \
+            -DRETRO_REVISION=3 -DRETRO_USE_MOD_LOADER=1 -DRETRO_MOD_LOADER_VER=2 \
+            -DGAME_INCLUDE_EDITOR=1 -DMANIA_PREPLUS=0 -DMANIA_FIRST_RELEASE=0 \
+            -DGAME_VERSION=5 -DGAME_TYPE=1 \
+            -ISaveEditorMod -ISaveEditorMod/Objects -IGameAPI_SDK/C \
+            GameAPI_SDK/C/GameAPI/Game.c SaveEditorMod/dllmain.c \
+            SaveEditorMod/Objects/UISaveSlot.c SaveEditorMod/Objects/UIMedallionPanel.c \
+            -o build_out/SaveEditor.framework/SaveEditor
+
+          cat << 'EOF' > build_out/SaveEditor.framework/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
+          <plist version="1.0"><dict>
+            <key>CFBundleExecutable</key><string>SaveEditor</string>
+            <key>CFBundleIdentifier</key><string>com.mania.mods.SaveEditor</string>
+            <key>CFBundleName</key><string>SaveEditor</string>
+            <key>CFBundlePackageType</key><string>FMWK</string>
+            <key>CFBundleShortVersionString</key><string>1.2.0</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>MinimumOSVersion</key><string>13.0</string>
+          </dict></plist>
+          EOF
+
+          mkdir -p Payload/RSDKv5.app/Frameworks
+          cp -r build_out/RSDKv5.app Payload/
+          find build_out -maxdepth 3 -name "*.framework" -exec cp -rn {} Payload/RSDKv5.app/Frameworks/ \;
+          rm -rf Payload/RSDKv5.app/Frameworks/ManiaTouchControls.framework Payload/RSDKv5.app/Data/mods Payload/RSDKv5.app/mods
+          DYLIB_SRC=$(find . -name "Game.dylib" | head -n 1)
+          if [ -n "$DYLIB_SRC" ]; then
+            cp "$DYLIB_SRC" Payload/RSDKv5.app/Frameworks/SonicMania
+            install_name_tool -id "@rpath/SonicMania" Payload/RSDKv5.app/Frameworks/SonicMania
+            rm -f Payload/RSDKv5.app/Frameworks/Game.dylib
+          fi
+          zip -r RSDKv5-iOS.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RSDKv5-iOS-IPA
+          path: RSDKv5-iOS.ipa
