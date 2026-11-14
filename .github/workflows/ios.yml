@@ -7,16 +7,11 @@ jobs:
   check_mod:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: Mania-Decomp-Mods/SaveEditor
-          submodules: recursive
-          path: SaveEditor
-
-      - name: Inspect SaveEditor Files
+      - name: Clone & Inspect SaveEditor
         run: |
+          git clone --recursive https://github.com SaveEditor
           find SaveEditor -maxdepth 3 -not -path '*/.*'
           echo "=== CMakeLists.txt ==="
           cat SaveEditor/CMakeLists.txt
-          echo "=== Header/Source check ==="
-          head -n 60 SaveEditor/SaveEditor/*
+          echo "=== Source Files ==="
+          head -n 80 SaveEditor/SaveEditor/*
