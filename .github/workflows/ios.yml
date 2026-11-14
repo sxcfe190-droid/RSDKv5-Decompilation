@@ -1,8 +1,8 @@
-name: Inspect iOS AVAudioSession Code
+name: Deep Inspect iOS Audio & Ducking
 on:
   workflow_dispatch:
 jobs:
-  inspect-audio:
+  deep-inspect-audio:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,10 +11,16 @@ jobs:
           ref: "ios"
           submodules: recursive
 
-      - name: Print All AVAudioSession & Audio Hint References
+      - name: Print All Audio Session & CoreAudio Internals
         run: |
-          echo "=== 1. AVAudioSession in RSDKv5/ ==="
-          grep -rn -C 8 -E "AVAudioSession|SDL_HINT_AUDIO_CATEGORY" RSDKv5/ || true
+          echo "=== 1. RSDKv5 Audio & Session References ==="
+          grep -rn -C 6 -E "AVAudioSession|AudioSession|SDL_HINT_AUDIO|SDL_OpenAudio" RSDKv5/ || true
 
-          echo "=== 2. AVAudioSession in dependencies/ios/SDL/ ==="
-          grep -rn -C 10 -E "AVAudioSession|SDL_HINT_AUDIO_CATEGORY" dependencies/ios/SDL/ || true
+          echo "=== 2. SDL2 CoreAudio AVAudioSession Implementation ==="
+          grep -rn -C 15 -E "AVAudioSession|SDL_HINT_AUDIO_CATEGORY|MixWithOthers|DuckOthers" dependencies/ios/SDL/src/audio/ || true
+
+          echo "=== 3. SDL2 UIKit Lifecycle Audio Session References ==="
+          grep -rn -C 8 -E "AVAudioSession|AudioSession" dependencies/ios/SDL/src/video/uikit/ || true
+
+          echo "=== 4. Game/ Audio Session References ==="
+          grep -rn -C 5 -E "AVAudioSession|AudioSession|SDL_HINT_AUDIO" Game/ || true
