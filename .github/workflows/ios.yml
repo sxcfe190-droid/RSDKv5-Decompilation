@@ -7,12 +7,10 @@ jobs:
   inspect:
     runs-on: macos-latest
     steps:
-      - name: Clone & Print GameAPI Function Tables
+      - name: Print Game.h Full Content
         run: |
           GH="github.com"
           REPO="RSDKModding/RSDKv5-GameAPI"
           git clone --depth 1 "https://${GH}/${REPO}.git" GAPI
-          echo "=== ModFunctionTable ==="
-          grep -rn -A 35 "struct ModFunctionTable" GAPI/C/
-          echo "=== RSDKFunctionTable (Save) ==="
-          grep -rn -i "Save" GAPI/C/
+          find GAPI/C -type f
+          cat GAPI/C/GameAPI/Game.h
