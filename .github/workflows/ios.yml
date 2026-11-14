@@ -398,7 +398,6 @@ jobs:
           #include "Objects/UISaveSlot.h"
           #include "Objects/UIMedallionPanel.h"
           #if RETRO_USE_MOD_LOADER
-          DLLExport ModVersionInfo modInfo = { RETRO_REVISION, GAME_VERSION, RETRO_MOD_LOADER_VER };
           DLLExport bool32 LinkModLogic(EngineInfo *info, const char *id);
           #endif
           void InitModAPI(void)
