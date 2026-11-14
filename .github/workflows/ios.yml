@@ -1,6 +1,7 @@
 name: Build RSDKv5 iOS True Final
 on:
   workflow_dispatch:
+
 jobs:
   build-ios:
     runs-on: macos-latest
@@ -10,6 +11,7 @@ jobs:
           repository: "WamWooWam/RSDKv5-Decompilation"
           ref: "ios"
           submodules: recursive
+
       - name: Patch Real Source Variables
         run: |
           sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
@@ -29,30 +31,28 @@ jobs:
           with open("RSDKv5/RSDK/Dev/Debug.cpp", "w", encoding="utf-8") as f:
               f.write(s)
 
-          # 1. A/B/X/Y = 모두 점프(KEYMASK_A), 가운데 왼쪽 = Select, 가운데 오른쪽 = Start, LB/RB = BumperL/R
           with open("RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp", "r", encoding="utf-8") as f:
               s = f.read()
           old_block = """    int32 buttonMap[] = {
-        SDL_CONTROLLER_BUTTON_DPAD_UP,   SDL_CONTROLLER_BUTTON_DPAD_DOWN,  SDL_CONTROLLER_BUTTON_DPAD_LEFT,    SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
-        SDL_CONTROLLER_BUTTON_A,         SDL_CONTROLLER_BUTTON_B,          SDL_CONTROLLER_BUTTON_INVALID,      SDL_CONTROLLER_BUTTON_X,
-        SDL_CONTROLLER_BUTTON_Y,         SDL_CONTROLLER_BUTTON_INVALID,    SDL_CONTROLLER_BUTTON_START,        SDL_CONTROLLER_BUTTON_BACK,
-        SDL_CONTROLLER_BUTTON_LEFTSTICK, SDL_CONTROLLER_BUTTON_RIGHTSTICK, SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
-    };
+              SDL_CONTROLLER_BUTTON_DPAD_UP,   SDL_CONTROLLER_BUTTON_DPAD_DOWN,  SDL_CONTROLLER_BUTTON_DPAD_LEFT,    SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
+              SDL_CONTROLLER_BUTTON_A,         SDL_CONTROLLER_BUTTON_B,          SDL_CONTROLLER_BUTTON_INVALID,      SDL_CONTROLLER_BUTTON_X,
+              SDL_CONTROLLER_BUTTON_Y,         SDL_CONTROLLER_BUTTON_INVALID,    SDL_CONTROLLER_BUTTON_START,        SDL_CONTROLLER_BUTTON_BACK,
+              SDL_CONTROLLER_BUTTON_LEFTSTICK, SDL_CONTROLLER_BUTTON_RIGHTSTICK, SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
+          };
 
-    int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT,  KEYMASK_RIGHT,  KEYMASK_A,      KEYMASK_B,      KEYMASK_C,       KEYMASK_X,
-                         KEYMASK_Y,  KEYMASK_Z,    KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };"""
+          int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT,  KEYMASK_RIGHT,  KEYMASK_A,      KEYMASK_B,      KEYMASK_C,       KEYMASK_X,
+                               KEYMASK_Y,  KEYMASK_Z,    KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };"""
           new_block = """    int32 buttonMap[] = {
-        SDL_CONTROLLER_BUTTON_DPAD_UP,      SDL_CONTROLLER_BUTTON_DPAD_DOWN,     SDL_CONTROLLER_BUTTON_DPAD_LEFT,    SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
-        SDL_CONTROLLER_BUTTON_A,            SDL_CONTROLLER_BUTTON_B,             SDL_CONTROLLER_BUTTON_X,            SDL_CONTROLLER_BUTTON_Y,
-        SDL_CONTROLLER_BUTTON_INVALID,      SDL_CONTROLLER_BUTTON_INVALID,       SDL_CONTROLLER_BUTTON_START,        SDL_CONTROLLER_BUTTON_BACK,
-        SDL_CONTROLLER_BUTTON_LEFTSTICK,    SDL_CONTROLLER_BUTTON_RIGHTSTICK,    SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
-    };
+              SDL_CONTROLLER_BUTTON_DPAD_UP,      SDL_CONTROLLER_BUTTON_DPAD_DOWN,     SDL_CONTROLLER_BUTTON_DPAD_LEFT,    SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
+              SDL_CONTROLLER_BUTTON_A,            SDL_CONTROLLER_BUTTON_B,             SDL_CONTROLLER_BUTTON_X,            SDL_CONTROLLER_BUTTON_Y,
+              SDL_CONTROLLER_BUTTON_INVALID,      SDL_CONTROLLER_BUTTON_INVALID,       SDL_CONTROLLER_BUTTON_START,        SDL_CONTROLLER_BUTTON_BACK,
+              SDL_CONTROLLER_BUTTON_LEFTSTICK,    SDL_CONTROLLER_BUTTON_RIGHTSTICK,    SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
+          };
 
-    int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT,  KEYMASK_RIGHT,  KEYMASK_A,      KEYMASK_A,      KEYMASK_A,       KEYMASK_A,
-                         KEYMASK_Y,  KEYMASK_Z,    KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };"""
+          int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT,  KEYMASK_RIGHT,  KEYMASK_A,      KEYMASK_A,      KEYMASK_A,       KEYMASK_A,
+                               KEYMASK_Y,  KEYMASK_Z,    KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };"""
           assert old_block in s, "buttonMap/keyMasks block not found!"
           s = s.replace(old_block, new_block)
-          # LB 누르면 Pause(keyStart) 신호도 함께 발생하도록 분리
           s = s.replace(
               "controller[controllerID].keyStart.press |= this->stateStart;",
               "controller[controllerID].keyStart.press |= (this->stateStart || this->stateBumper_L);"
@@ -60,7 +60,6 @@ jobs:
           with open("RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp", "w", encoding="utf-8") as f:
               f.write(s)
 
-          # 2. Dev Menu는 Select 대신 RB(BumperR)로 열리도록 분리
           with open("RSDKv5/RSDK/Core/RetroEngine.cpp", "r", encoding="utf-8") as f:
               s = f.read()
           assert "if (controller[CONT_P1].keySelect.press)" in s, "keySelect.press not found!"
@@ -110,6 +109,7 @@ jobs:
             <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
           </dict></plist>
           EOF
+
       - name: Build & Package
         run: |
           xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 -configuration Release -sdk iphoneos -destination "generic/platform=iOS" IPHONEOS_DEPLOYMENT_TARGET=13.0 GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_USE_MOD_LOADER=1 RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 RETRO_USE_ORIGINAL_CODE=0' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR="$PWD/build_out"
@@ -124,6 +124,7 @@ jobs:
             rm -f Payload/RSDKv5.app/Frameworks/Game.dylib
           fi
           zip -r RSDKv5-iOS.ipa Payload
+
       - uses: actions/upload-artifact@v4
         with:
           name: RSDKv5-iOS-IPA
