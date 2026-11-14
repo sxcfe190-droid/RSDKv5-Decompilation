@@ -287,93 +287,6 @@ jobs:
               }
               static bool32 prevTouch = false;
               bool32 touchPress = touched && !prevTouch; prevTouch = touched;
-              bool32 rbPress = TriggerInfoR[CONT_ANY].keyBumper.press || TriggerInfoR[CONT_P1].keyBumper.press || ControllerInfo[CONT_ANY].keyBumperR.press || ControllerInfo[CONT_P1].keyBumperR.press;
-
-              if (!editingSave) {
-                  if (rbPress || touchPress) {
-                      API.LoadUserFile("SaveData.bin", &saveDataCache, sizeof(SaveDataFile), SaveData_LoadCB);
-                      editingSave = true; editSlot = activeSlot->slotID; editIsEncore = activeSlot->isEncoreSave; editSelection = 0;
-                      RSDK.PlaySfx(RSDK.GetSfx("Global/MenuMove.wav"), false, 255);
-                  }
-                  return;
-              }
-
-              SaveRAM *saveRAM = &saveDataCache.slots[editSlot + (editIsEncore ? 8 : 0)];
-              bool32 exitAct = (editSelection == 6 && ControllerInfo[CONT_ANY].keyA.press);
-              if (exitAct || ControllerInfo[CONT_ANY].keyB.press || rbPress || touchPress) {
-                  editingSave = false;
-                  API.SaveUserFile("SaveData.bin", &saveDataCache, sizeof(SaveDataFile), SaveData_SaveCB, false);
-                  RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBack.wav"), false, 255);
-                  return;
-              }
-              if (ControllerInfo[CONT_ANY].keyUp.press) {
-                  if (--editSelection < 0) editSelection = 6;
-                  RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBleep.wav"), false, 255);
-              } else if (ControllerInfo[CONT_ANY].keyDown.press) {
-                  if (++editSelection > 6) editSelection = 0;
-                  RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBleep.wav"), false, 255);
-              }
-              int32 dir = ControllerInfo[CONT_ANY].keyRight.press ? 1 : (ControllerInfo[CONT_ANY].keyLeft.press ? -1 : 0);
-              if (dir && editSelection < 6) {
-                  if (editSelection == 0) {
-                      uint8 m = API.CheckDLC(DLC_PLUS) ? 5 : 3;
-                      if (dir > 0) { if (++saveRAM->characterID > m) saveRAM->characterID = 1; }
-                      else { if (--saveRAM->characterID < 1) saveRAM->characterID = m; }
-                  } else if (editSelection == 1) {
-                      int32 zm = (!editIsEncore && (saveRAM->characterID == 1 || saveRAM->characterID == 4 || saveRAM->characterID == 5)) ? ZONE_ERZ : ZONE_TMZ;
-                      if (dir > 0) { if (++saveRAM->zoneID > zm) { saveRAM->zoneID = ZONE_GHZ; saveRAM->saveState = SAVEFILE_REGULAR; } else if (saveRAM->zoneID == zm) saveRAM->saveState = SAVEFILE_COMPLETE; }
-                      else { if (saveRAM->zoneID == zm) { if (saveRAM->saveState == SAVEFILE_COMPLETE) saveRAM->saveState = SAVEFILE_REGULAR; else saveRAM->zoneID--; } else if (--saveRAM->zoneID >= ZONE_MAX) { saveRAM->zoneID = zm; saveRAM->saveState = SAVEFILE_COMPLETE; } }
-                      activeSlot->saveZoneID = saveRAM->zoneID;
-                  } else if (editSelection == 2) {
-                      saveRAM->lives += dir; if (saveRAM->lives < 1) saveRAM->lives = 99; else if (saveRAM->lives > 99) saveRAM->lives = 1;
-                      activeSlot->saveLives = saveRAM->lives;
-                  } else if (editSelection == 3) {
-                      int32 c = (int32)saveRAM->continues + dir; if (c < 0) c = 99; else if (c > 99) c = 0;
-                      saveRAM->continues = (uint8)c; activeSlot->saveContinues = saveRAM->continues;
-                  } else if (editSelection == 4) {
-                      saveRAM->score += dir * 10000; if (saveRAM->score < 0) saveRAM->score = 9999990; else if (saveRAM->score > 9999990) saveRAM->score = 0;
-                  } else if (editSelection == 5) {
-                      int32 em = 0; for (int32 i = 0; i < 7; ++i) if (saveRAM->chaosEmeralds & (1 << i)) em++;
-                      em += dir; if (em < 0) em = 7; else if (em > 7) em = 0;
-                      saveRAM->chaosEmeralds = 0; for (int32 i = 0; i < em; ++i) saveRAM->chaosEmeralds |= (1 << i);
-                      activeSlot->saveEmeralds = saveRAM->chaosEmeralds;
-                  }
-                  RSDK.PlaySfx(RSDK.GetSfx("Global/MenuBleep.wav"), false, 255);
-                  if (saveRAM->saveState == SAVEFILE_COMPLETE) activeSlot->frameID = 14;
-                  else { activeSlot->frameID = activeSlot->saveZoneID + 1; if (editIsEncore && activeSlot->saveZoneID >= ZONE_MSZ) activeSlot->frameID--; if (activeSlot->saveZoneID == ZONE_ERZ) activeSlot->frameID = 13; }
-                  if (UISaveSlot) {
-                      RSDK.SetSpriteAnimation(UISaveSlot->aniFrames, 1, &activeSlot->playersAnimator, true, saveRAM->characterID);
-                      RSDK.SetSpriteAnimation(UISaveSlot->aniFrames, 2, &activeSlot->shadowsAnimator, true, saveRAM->characterID);
-                  }
-              }
-          }
-          EOF
-          void SaveEditor_OnUpdate(void *data) {
-              (void)data;
-              int32 slotClass = RSDK.FindObject("UISaveSlot");
-              if (slotClass <= 0) { editingSave = false; return; }
-              EntityUISaveSlot *activeSlot = NULL;
-              foreach_all_type(slotClass, ent) {
-                  EntityUISaveSlot *slot = (EntityUISaveSlot *)ent;
-                  if (slot->type == UISAVESLOT_REGULAR && !slot->isNewSave && (slot->isSelected || slot->currentlySelected)) {
-                      activeSlot = slot;
-                      break;
-                  }
-              }
-              if (!activeSlot) { editingSave = false; return; }
-
-              bool32 touched = false;
-              if (TouchInfo->count) {
-                  int32 sx = ScreenInfo[SceneInfo->currentScreenID].size.x;
-                  int32 sy = ScreenInfo[SceneInfo->currentScreenID].size.y;
-                  for (int32 t = 0; t < TouchInfo->count; ++t) {
-                      int32 tx = (int32)(TouchInfo->x[t] * sx);
-                      int32 ty = (int32)(TouchInfo->y[t] * sy);
-                      if (TouchInfo->down[t] && tx >= 0 && ty >= sy - 32 && tx <= 32 && ty <= sy) { touched = true; break; }
-                  }
-              }
-              static bool32 prevTouch = false;
-              bool32 touchPress = touched && !prevTouch; prevTouch = touched;
               bool32 rbPress = TriggerInfoR[CONT_ANY].keyBumper.press || TriggerInfoR[CONT_P1].keyBumper.press;
 
               if (!editingSave) {
@@ -435,8 +348,54 @@ jobs:
               }
           }
           EOF
+          python3 -c '
+          lb, rb = chr(91), chr(93)
+          reps = [
+              ("SaveEditorMod/Objects/SaveGame.h", "SaveRAM slots;", f"SaveRAM slots{lb}16{rb};"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "const char *chars = {", f"const char *chars{lb}7{rb} = {{"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "const char *zones = {", f"const char *zones{lb}14{rb} = {{"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "char buf;", f"char buf{lb}7{rb}{lb}40{rb};"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"CHARACTER:", f"snprintf(buf{lb}0{rb}, 40, \"CHARACTER:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"ZONE:", f"snprintf(buf{lb}1{rb}, 40, \"ZONE:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"LIVES:", f"snprintf(buf{lb}2{rb}, 40, \"LIVES:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"CONTINUES:", f"snprintf(buf{lb}3{rb}, 40, \"CONTINUES:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"SCORE:", f"snprintf(buf{lb}4{rb}, 40, \"SCORE:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"EMERALDS:", f"snprintf(buf{lb}5{rb}, 40, \"EMERALDS:"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "snprintf(buf, 40, \"EXIT\"", f"snprintf(buf{lb}6{rb}, 40, \"EXIT\""),
+          ]
+          for path, old, new in reps:
+              s = open(path).read()
+              assert old in s, f"Missing {old} in {path}"
+              open(path, "w").write(s.replace(old, new))
+          '
 
-
+          cat << 'EOF' > SaveEditorMod/dllmain.c
+          #include "GameAPI/Game.h"
+          #include "Objects/UISaveSlot.h"
+          #if RETRO_USE_MOD_LOADER
+          DLLExport bool32 LinkModLogic(EngineInfo *info, const char *id);
+          #endif
+          void InitModAPI(void)
+          {
+              MOD_REGISTER_OBJECT_HOOK(UISaveSlot);
+              Mod.AddModCallback(MODCB_ONUPDATE, SaveEditor_OnUpdate);
+              Mod.AddModCallback(MODCB_ONDRAW, SaveEditor_OnDraw);
+          }
+          #if RETRO_USE_MOD_LOADER
+          bool32 LinkModLogic(EngineInfo *info, const char *id)
+          {
+          #if MANIA_USE_PLUS
+              LinkGameLogicDLL(info);
+          #else
+              LinkGameLogicDLL(*info);
+          #endif
+              globals = Mod.GetGlobals();
+              modID = id;
+              InitModAPI();
+              return true;
+          }
+          #endif
+          EOF
           GH="github.com"
           GAPI_REPO="RSDKModding/RSDKv5-GameAPI"
           git clone --depth 1 "https://${GH}/${GAPI_REPO}.git" GameAPI_SDK
