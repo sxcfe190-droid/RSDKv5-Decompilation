@@ -1,4 +1,4 @@
-name: Build RSDKv5 iOS Ultimate
+name: Build RSDKv5 iOS Ultimate LogFixed
 on:
   workflow_dispatch:
 jobs:
@@ -16,7 +16,7 @@ jobs:
         with:
           repository: "RSDKModding/Sonic-Mania-Decompilation"
           path: "Sonic-Mania-Decompilation"
-      - name: Apply All Ultimate Patches
+      - name: Apply Exact Log-Verified Patches
         run: |
           rm -rf Game
           ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
@@ -27,23 +27,11 @@ jobs:
               with open(p, "r", encoding="utf-8", errors="ignore") as f:
                   s = f.read()
               orig = s
-              s = s.replace('dataPath + "mods"', '(fs::path(userFilePath) / "mods").string()')
-              s = s.replace('dataPath + "/mods"', '(fs::path(userFilePath) / "mods").string()')
-              s = s.replace('fs::path(dataPath) / "mods"', 'fs::path(userFilePath) / "mods"')
-              if "ModAPI.cpp" in p:
-                  inject = (
-                      '\n    fs::path extModDir = fs::path(userFilePath) / "mods";\n'
-                      '    if (fs::exists(extModDir)) {\n'
-                      '        fs::path modCfg = extModDir / "modconfig.ini";\n'
-                      '        if (!fs::exists(modCfg)) {\n'
-                      '            FILE *cf = fopen(modCfg.string().c_str(), "w");\n'
-                      '            if (cf) { fputs("[Mods]\\n", cf); fclose(cf); }\n'
-                      '        }\n'
-                      '    }\n'
-                      '    modPath = extModDir.string() + "/";\n'
-                  )
-                  s = re.sub(r"(void\s+Mod::InitMods\s*\([^)]*\)\s*\{)", r"\1" + inject, s)
-                  s = re.sub(r"modPath\s*=\s*[^;]*dataPath[^;]*;", 'modPath = (fs::path(userFilePath) / "mods").string() + "/";', s)
+              if "ModAPI" in p:
+                  s = s.replace('dataPath + "mods"', 'std::string(userFilePath) + "mods"')
+                  s = s.replace('dataPath + "/mods"', 'std::string(userFilePath) + "mods"')
+                  s = s.replace('fs::path(dataPath) / "mods"', 'fs::path(userFilePath) / "mods"')
+                  s = re.sub(r'modPath\s*=\s*[^;]+;', 'modPath = (fs::path(userFilePath) / "mods").string() + "/"; fs::create_directories(modPath);', s)
               if "DevMenu" in p:
                   s = s.replace("modList.size() > 0", "true")
                   s = s.replace("modList.size() == 0", "false")
@@ -55,6 +43,16 @@ jobs:
               if "streamsEnabled" in s:
                   s = s.replace("streamsEnabled = false;", "streamsEnabled = true;")
                   s = s.replace("streamsEnabled = 0;", "streamsEnabled = 1;")
+              if "optionsPtr->volMusic" in s:
+                  s = s.replace("optionsPtr->volMusic", "(optionsPtr->volMusic > 100 ? 100 : optionsPtr->volMusic)")
+              if "optionsPtr->volSfx" in s:
+                  s = s.replace("optionsPtr->volSfx", "(optionsPtr->volSfx > 100 ? 100 : optionsPtr->volSfx)")
+              if "Audio" in p:
+                  s = re.sub(r"#if\s+RETRO_USING_VORBIS.*", "#if 1", s)
+                  s = re.sub(r"#ifdef\s+RETRO_USING_VORBIS\b", "#if 1", s)
+                  s = re.sub(r"#ifndef\s+RETRO_USING_VORBIS\b", "#if 0", s)
+                  s = re.sub(r"#if\s+!RETRO_USING_VORBIS\b", "#if 0", s)
+                  s = re.sub(r"#if\s+USE_STB_VORBIS.*", "#if 1", s)
               if "SDL_SCANCODE_" in s and "case SDL_SCANCODE_" not in s:
                   s = re.sub(r"\bSDL_SCANCODE_[A-Z0-9_]+\b", "0x0", s)
               if "SDL_CreateWindow(" in s:
@@ -69,8 +67,17 @@ jobs:
                   s = f.read()
               orig = s
               if "SDL_InitSubSystem" in s:
-                  hints = 'SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0"); SDL_SetHint(SDL_HINT_AUDIO_CATEGORY, "ambient"); '
+                  hints = 'SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0"); SDL_SetHint("SDL_AUDIO_CATEGORY", "ambient"); '
                   s = s.replace("SDL_InitSubSystem(", hints + "SDL_InitSubSystem(")
+              if s != orig:
+                  with open(p, "w", encoding="utf-8", errors="ignore") as f:
+                      f.write(s)
+          for p in glob.glob("dependencies/ios/SDL/src/audio/coreaudio/*.m", recursive=True) + glob.glob("dependencies/ios/SDL/src/video/uikit/*.m", recursive=True):
+              with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                  s = f.read()
+              orig = s
+              s = s.replace("AVAudioSessionCategorySoloAmbient", "AVAudioSessionCategoryAmbient")
+              s = s.replace("AVAudioSessionCategoryPlayback", "AVAudioSessionCategoryAmbient")
               if s != orig:
                   with open(p, "w", encoding="utf-8", errors="ignore") as f:
                       f.write(s)
@@ -163,7 +170,7 @@ jobs:
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 MANIA_FIRST_RELEASE=0 RETRO_USE_STB_VORBIS=1' \
+            GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 MANIA_FIRST_RELEASE=0 RETRO_USE_STB_VORBIS=1 RETRO_USING_VORBIS=1' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
