@@ -1,8 +1,8 @@
-name: Fact Check Input & Mania Plus
+name: Check Game Plus Definitions
 on:
   workflow_dispatch:
 jobs:
-  fact-check:
+  check-plus:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,16 +11,11 @@ jobs:
           ref: "ios"
           submodules: recursive
 
-      - name: Print Real Build Targets & Plus Logic
+      - name: Print Game Plus Preprocessor & Header
         run: |
-          echo "=== 1. Xcode project.pbxproj Input, Engine & Game references ==="
-          grep -n -E "InputDevice|RetroEngine|UserCore|ModAPI|Game\.xcodeproj|SonicMania" RSDKv5.xcodeproj/project.pbxproj || true
-
-          echo "=== 2. Xcode Preprocessor Definitions ==="
-          grep -n -C 5 "GCC_PREPROCESSOR_DEFINITIONS" RSDKv5.xcodeproj/project.pbxproj || true
-
-          echo "=== 3. All InputDevice & RetroEngine files in repo ==="
-          find . -maxdepth 5 -name "*InputDevice*.cpp" -o -name "RetroEngine.cpp"
-
-          echo "=== 4. Game/ Plus & Encore DLC Check Logic ==="
-          grep -rn -C 5 -E "MANIA_USE_PLUS|CheckDLC|DLC_PLUS|encore|Encore" Game/ | head -n 120 || true
+          echo "=== 1. Game/SonicMania.xcodeproj Preprocessor Definitions ==="
+          grep -n -C 5 "GCC_PREPROCESSOR_DEFINITIONS" Game/SonicMania.xcodeproj/project.pbxproj || true
+          echo "=== 2. MANIA_USE_PLUS in Game/ source ==="
+          grep -rn -C 5 "MANIA_USE_PLUS" Game/ || true
+          echo "=== 3. CheckDLC in Game/ source ==="
+          grep -rn -C 3 "CheckDLC" Game/ | head -n 60 || true
