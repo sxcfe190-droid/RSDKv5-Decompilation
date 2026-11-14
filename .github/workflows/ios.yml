@@ -1,8 +1,8 @@
-name: Build RSDKv5 iOS Final
+name: Inspect RSDKv5 iOS Source
 on:
   workflow_dispatch:
 jobs:
-  build-ios:
+  inspect:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -10,75 +10,14 @@ jobs:
           repository: "WamWooWam/RSDKv5-Decompilation"
           ref: "ios"
           submodules: recursive
-      - uses: actions/checkout@v4
-        with:
-          repository: "RSDKModding/Sonic-Mania-Decompilation"
-          path: "Sonic-Mania-Decompilation"
-      - name: Patch Everything
+      - name: Inspect Source
         run: |
-          rm -rf Game && ln -s "$PWD/Sonic-Mania-Decompilation" "$PWD/Game"
-          sed -i '' 's/name = Framework;/name = Framework-macOS;/g' dependencies/ios/SDL/Xcode/SDL/SDL.xcodeproj/project.pbxproj
-          STB_SRC=$(find . -name "stb_vorbis.c" | head -n 1)
-          if [ -n "$STB_SRC" ] && [ ! -f "RSDKv5/RSDK/Audio/stb_vorbis.c" ]; then cp "$STB_SRC" RSDKv5/RSDK/Audio/stb_vorbis.c; fi
-          cat << 'EOF' > patch.py
-          import glob, re, os
-          has_stb = os.path.exists("RSDKv5/RSDK/Audio/stb_vorbis.c")
-          for p in glob.glob("RSDKv5/RSDK/**/*.*", recursive=True) + glob.glob("Sonic-Mania-Decompilation/**/*.*", recursive=True) + glob.glob("dependencies/ios/**/*.cpp", recursive=True):
-              if not p.endswith((".cpp", ".c", ".h", ".hpp")): continue
-              with open(p, "r", encoding="utf-8", errors="ignore") as f: s = f.read()
-              o = s
-              if has_stb and "Audio.cpp" in p and "stb_vorbis.c" not in s: s = '#define STB_VORBIS_NO_PUSHDATA_API\n#include "stb_vorbis.c"\n' + s
-              if "ModAPI" in p or "FileIO" in p:
-                  s = s.replace('dataPath + "mods"', '(std::string(userFilePath) + "mods")').replace('dataPath + "/mods"', '(std::string(userFilePath) + "mods")').replace('fs::path(dataPath) / "mods"', 'fs::path(userFilePath) / "mods"')
-              if "ModAPI.cpp" in p:
-                  s = re.sub(r'(void\s+[a-zA-Z0-9_:]*InitMods\s*\([^)]*\)\s*\{)', r'\1\n    fs::create_directories(fs::path(userFilePath) / "mods");\n    modPath = fs::path(userFilePath) / "mods";\n', s)
-              if "DevMenu" in p:
-                  s = s.replace("modList.size() > 0", "true").replace("modList.size() == 0", "false").replace("!modList.empty()", "true").replace("modList.empty()", "false")
-              s = s.replace("devMenu = false;", "devMenu = true;").replace("devMenu = 0;", "devMenu = 1;").replace("streamsEnabled = false;", "streamsEnabled = true;").replace("streamsEnabled = 0;", "streamsEnabled = 1;")
-              if "SDL_SCANCODE_" in s and "case SDL_SCANCODE_" not in s: s = re.sub(r"\bSDL_SCANCODE_[A-Z0-9_]+\b", "0x0", s)
-              if "SDL_CreateWindow(" in s: s = s.replace("SDL_WINDOW_FULLSCREEN_DESKTOP", "SDL_WINDOW_RESIZABLE").replace("SDL_WINDOW_FULLSCREEN", "SDL_WINDOW_RESIZABLE").replace("SDL_WINDOW_SHOWN", "SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE")
-              if "SDL_InitSubSystem" in s: s = s.replace("SDL_InitSubSystem(", 'SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0"); SDL_InitSubSystem(')
-              s = s.replace("#define MANIA_USE_PLUS 0", "#define MANIA_USE_PLUS 1").replace("dlcEnabled = false;", "dlcEnabled = true;").replace("dlcEnabled = 0;", "dlcEnabled = 1;").replace("API.CheckDLC(DLC_PLUS)", "true").replace("CheckDLC(DLC_PLUS)", "true")
-              if s != o:
-                  with open(p, "w", encoding="utf-8", errors="ignore") as f: f.write(s)
-          EOF
-          python3 patch.py
-          cat << 'EOF' > RSDKv5/Info.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
-          <plist version="1.0"><dict>
-            <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
-            <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-            <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
-            <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>1.3.2</string>
-            <key>CFBundleVersion</key><string>1</string>
-            <key>LSRequiresIPhoneOS</key><true/>
-            <key>UIRequiresFullScreen</key><false/>
-            <key>UIFileSharingEnabled</key><true/>
-            <key>LSSupportsOpeningDocumentsInPlace</key><true/>
-            <key>GCSupportedGameControllers</key><array><dict><key>ProfileName</key><string>ExtendedGamepad</string></dict></array>
-            <key>GCSupportsControllerUserInteraction</key><true/>
-            <key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
-            <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
-            <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
-          </dict></plist>
-          EOF
-      - name: Build & Package
-        run: |
-          xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 -configuration Release -sdk iphoneos -destination "generic/platform=iOS" IPHONEOS_DEPLOYMENT_TARGET=13.0 GCC_PREPROCESSOR_DEFINITIONS='$(inherited) RETRO_MOD_LOADER=1 RETRO_REVISION=3 MANIA_USE_PLUS=1 RETRO_USE_STB_VORBIS=1' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR="$PWD/build_out"
-          mkdir -p Payload/RSDKv5.app/Frameworks
-          cp -r build_out/RSDKv5.app Payload/
-          find build_out -maxdepth 3 -name "*.framework" -exec cp -rn {} Payload/RSDKv5.app/Frameworks/ \;
-          rm -rf Payload/RSDKv5.app/Frameworks/ManiaTouchControls.framework Payload/RSDKv5.app/Data/mods Payload/RSDKv5.app/mods
-          DYLIB_SRC=$(find . -name "Game.dylib" | head -n 1)
-          if [ -n "$DYLIB_SRC" ]; then
-            cp "$DYLIB_SRC" Payload/RSDKv5.app/Frameworks/SonicMania
-            install_name_tool -id "@rpath/SonicMania" Payload/RSDKv5.app/Frameworks/SonicMania
-            rm -f Payload/RSDKv5.app/Frameworks/Game.dylib
-          fi
-          zip -r RSDKv5-iOS.ipa Payload
-      - uses: actions/upload-artifact@v4
-        with:
-          name: RSDKv5-iOS-IPA
-          path: RSDKv5-iOS.ipa
+          echo "=== ModAPI ==="
+          grep -rn "mods" RSDKv5/RSDK/
+          echo "=== Audio ==="
+          ls -la RSDKv5/RSDK/Audio/
+          head -n 60 RSDKv5/RSDK/Audio/Audio.cpp
+          echo "=== DevMenu Mods ==="
+          grep -rn -C 5 "Mods" RSDKv5/RSDK/Dev/
+          echo "=== Xcode Preprocessor ==="
+          grep -rn "GCC_PREPROCESSOR_DEFINITIONS" RSDKv5.xcodeproj/
