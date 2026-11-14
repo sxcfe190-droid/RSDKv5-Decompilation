@@ -370,6 +370,21 @@ jobs:
               return false;
           }
           EOF
+                    python3 -c '
+          lb, rb = chr(91), chr(93)
+          reps = [
+              ("SaveEditorMod/Objects/GameProgress.h", "unlockedStages;", f"unlockedStages{lb}32{rb};"),
+              ("SaveEditorMod/Objects/SaveGame.h", "SaveRAM slots;", f"SaveRAM slots{lb}16{rb};"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "uint8 lst = {", f"uint8 lst{lb}3{rb} = {{"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "uint8 ml = {", f"uint8 ml{lb}3{rb} = {{"),
+              ("SaveEditorMod/Objects/UISaveSlot.c", "(lst << 0) | (lst << 8); saveRAM->stock = lst;", f"(lst{lb}0{rb} << 0) | (lst{lb}1{rb} << 8); saveRAM->stock = lst{lb}2{rb};"),
+          ]
+          for path, old, new in reps:
+              s = open(path).read()
+              assert old in s, f"Missing {old} in {path}"
+              open(path, "w").write(s.replace(old, new))
+          '
+
           cat << 'EOF' > SaveEditorMod/dllmain.c
           #include "GameAPI/Game.h"
           #include "Objects/UISaveSlot.h"
