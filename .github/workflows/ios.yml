@@ -145,7 +145,7 @@ jobs:
 
       - name: Build RSDKv5 and SaveEditor Framework
         run: |
-                    xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 \
+          xcodebuild -project RSDKv5.xcodeproj -scheme RSDKv5 \
             -configuration Release -sdk iphoneos \
             -destination "generic/platform=iOS" \
             IPHONEOS_DEPLOYMENT_TARGET=13.0 \
@@ -154,6 +154,7 @@ jobs:
             CONFIGURATION_BUILD_DIR="$PWD/build_out"
 
           mkdir -p SaveEditorMod/Objects
+
 
           cat << 'EOF' > SaveEditorMod/Objects/Misc.h
           #ifndef OBJ_MISC_H
