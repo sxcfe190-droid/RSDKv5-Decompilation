@@ -216,9 +216,15 @@ jobs:
           #include "GameAPI/Game.h"
           typedef enum { MEDAL_SILVER = 1, MEDAL_GOLD = 2 } MedalTypes;
           typedef struct {
-              uint8 goldMedals; uint8 silverMedals; uint8 field_2; uint8 field_3;
-              uint32 allGoldMedals; uint32 allSilverMedals;
-              uint8 unlockedStages; uint8 emeraldObtained; uint8 unreadNotifs;
+              uint8 goldMedals;
+              uint8 silverMedals;
+              uint8 field_2;
+              uint8 field_3;
+              uint32 allGoldMedals;
+              uint32 allSilverMedals;
+              uint8 unlockedStages;
+              uint8 emeraldObtained;
+              uint8 unreadNotifs;
           } GameProgress;
           #endif
           EOF
@@ -228,16 +234,32 @@ jobs:
           #define OBJ_SAVEGAME_H
           #include "GameAPI/Game.h"
           typedef enum {
-              SAVEFILE_EMPTY = 0, SAVEFILE_REGULAR = 1, SAVEFILE_COMPLETE = 2
+              SAVEFILE_EMPTY = 0,
+              SAVEFILE_REGULAR = 1,
+              SAVEFILE_COMPLETE = 2
           } SaveStates;
           typedef struct {
-              uint8 saveState; uint8 characterID; uint8 zoneID; uint8 lives;
-              int32 score; int32 score1UP; uint8 chaosEmeralds; uint8 continues;
-              uint8 characterFlags; uint8 stock; uint16 playerID; uint16 filter;
-              int32 collectedSpecialRings; int32 nextSpecialRing;
-              int32 scoreBonus; int32 padding;
+              uint8 saveState;
+              uint8 characterID;
+              uint8 zoneID;
+              uint8 lives;
+              int32 score;
+              int32 score1UP;
+              uint8 chaosEmeralds;
+              uint8 continues;
+              uint8 characterFlags;
+              uint8 stock;
+              uint16 playerID;
+              uint16 filter;
+              int32 collectedSpecialRings;
+              int32 nextSpecialRing;
+              int32 scoreBonus;
+              int32 padding;
           } SaveRAM;
-          typedef struct { SaveRAM slots; uint8 padding_end; } SaveDataFile;
+          typedef struct {
+              SaveRAM slots;
+              uint8 padding_end;
+          } SaveDataFile;
           #endif
           EOF
 
@@ -250,8 +272,13 @@ jobs:
           typedef struct {
               RSDK_ENTITY
               StateMachine(state);
-              int32 timer; uint8 column; uint8 row;
-              uint8 medal; uint8 panelX; uint8 panelY; Animator animator;
+              int32 timer;
+              uint8 column;
+              uint8 row;
+              uint8 medal;
+              uint8 panelX;
+              uint8 panelY;
+              Animator animator;
           } EntityUIMedallionPanel;
           extern ObjectUIMedallionPanel *UIMedallionPanel;
           bool32 UIMedallionPanel_State_Selected_Hook(bool32 skipped);
@@ -273,39 +300,44 @@ jobs:
                       int32 tx = (int32)(TouchInfo->x[t] * sx);
                       int32 ty = (int32)(TouchInfo->y[t] * sy);
                       if (TouchInfo->down[t] && tx >= 0 && ty >= sy - 32 && tx <= 32 && ty <= sy) {
-                          touched = true; break;
+                          touched = true;
+                          break;
                       }
                   }
               }
               static bool32 prevTouch = false;
-              bool32 touchPress = touched && !prevTouch; prevTouch = touched;
+              bool32 touchPress = touched && !prevTouch;
+              prevTouch = touched;
               if (TriggerInfoR[CONT_ANY].keyBumper.press || touchPress) {
                   GameProgress *progress = (GameProgress *)Mod.GetGlobals();
                   uint8 id = self->column + 8 * self->row;
-                  switch (self->medal) {
-                      case 0:
-                          self->medal = MEDAL_SILVER; progress->silverMedals++;
-                          progress->unlockedStages[id] = true;
-                          progress->allSilverMedals |= (1 << id);
-                          progress->allGoldMedals &= ~(1 << id); break;
-                      case MEDAL_SILVER:
-                          self->medal = MEDAL_GOLD; progress->silverMedals--;
-                          progress->goldMedals++; progress->unlockedStages[id] = true;
-                          progress->allSilverMedals |= (1 << id);
-                          progress->allGoldMedals |= (1 << id); break;
-                      case MEDAL_GOLD:
-                          self->medal = 0; progress->goldMedals--;
-                          progress->unlockedStages[id] = false;
-                          progress->allSilverMedals &= ~(1 << id);
-                          progress->allGoldMedals &= ~(1 << id); break;
-                      default: break;
+                  if (self->medal == 0) {
+                      self->medal = MEDAL_SILVER;
+                      progress->silverMedals++;
+                      progress->unlockedStages[id] = true;
+                      progress->allSilverMedals |= (1 << id);
+                      progress->allGoldMedals &= ~(1 << id);
+                  } else if (self->medal == MEDAL_SILVER) {
+                      self->medal = MEDAL_GOLD;
+                      progress->silverMedals--;
+                      progress->goldMedals++;
+                      progress->unlockedStages[id] = true;
+                      progress->allSilverMedals |= (1 << id);
+                      progress->allGoldMedals |= (1 << id);
+                  } else if (self->medal == MEDAL_GOLD) {
+                      self->medal = 0;
+                      progress->goldMedals--;
+                      progress->unlockedStages[id] = false;
+                      progress->allSilverMedals &= ~(1 << id);
+                      progress->allGoldMedals &= ~(1 << id);
                   }
                   RSDK.SetSpriteAnimation(UIMedallionPanel->aniFrames, 5, &self->animator, true, self->medal);
                   RSDK.PlaySfx(RSDK.GetSfx("Stage/SpecialRing.wav"), false, 255);
               }
               return false;
           }
-          EOF          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.h
+          EOF
+          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.h
           #ifndef OBJ_UISAVESLOT_H
           #define OBJ_UISAVESLOT_H
           #include "GameAPI/Game.h"
@@ -421,9 +453,7 @@ jobs:
               }
               out[digits] = 0;
           }
-          EOF
-
-          cat << 'EOF' >> SaveEditorMod/Objects/UISaveSlot.c
+          EOF          cat << 'EOF' >> SaveEditorMod/Objects/UISaveSlot.c
           void SaveEditor_OnDraw(void *data) {
               (void)data;
               if (!editingSave) return;
@@ -655,8 +685,8 @@ jobs:
           ui = "SaveEditorMod/Objects/UISaveSlot.c"
           reps = [
               (gp, "unlockedStages;", f"unlockedStages{lb}32{rb};"),
-              (sg, "SaveRAM slots; uint8 padding_end;",
-                   f"SaveRAM slots{lb}16{rb}; uint8 padding{lb}0x1000{rb};"),
+              (sg, "SaveRAM slots;\n    uint8 padding_end;",
+                   f"SaveRAM slots{lb}16{rb};\n    uint8 padding{lb}0x1000{rb};"),
               (ui, "const uint8 FONT5X7_ROWS = {",
                    f"const uint8 FONT5X7_ROWS{lb}41 * 7{rb} = {{"),
               (ui, "const char *charNames = {",
@@ -774,3 +804,4 @@ jobs:
         with:
           name: RSDKv5-iOS-IPA
           path: RSDKv5-iOS.ipa
+
