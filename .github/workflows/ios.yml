@@ -9,7 +9,9 @@ jobs:
     steps:
       - name: Clone & Inspect SaveEditor
         run: |
-          git clone --recursive https://github.com SaveEditor
+          HOST="github.com"
+          REPO="Mania-Decomp-Mods/SaveEditor"
+          git clone --recursive "https://${HOST}/${REPO}.git" SaveEditor
           find SaveEditor -maxdepth 3 -not -path '*/.*'
           echo "=== CMakeLists.txt ==="
           cat SaveEditor/CMakeLists.txt
