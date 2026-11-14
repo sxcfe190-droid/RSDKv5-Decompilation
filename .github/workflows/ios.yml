@@ -1,18 +1,22 @@
-name: Quick Check ModAPI iOS
+name: Check SaveEditor Source
 
 on:
   workflow_dispatch:
 
 jobs:
-  check:
+  check_mod:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: WamWooWam/RSDKv5-Decompilation
-          ref: ios
-          path: RSDKv5
+          repository: Mania-Decomp-Mods/SaveEditor
+          submodules: recursive
+          path: SaveEditor
 
-      - name: Check ModAPI Logic Load
+      - name: Inspect SaveEditor Files
         run: |
-          grep -rn -C 15 "LinkModLogic\|dlopen\|LoadLibrary" RSDKv5/RSDKv5/
+          find SaveEditor -maxdepth 3 -not -path '*/.*'
+          echo "=== CMakeLists.txt ==="
+          cat SaveEditor/CMakeLists.txt
+          echo "=== Header/Source check ==="
+          head -n 60 SaveEditor/SaveEditor/*
