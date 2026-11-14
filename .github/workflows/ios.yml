@@ -1,15 +1,19 @@
-name: Inspect SDL2InputDevice UpdateInput Exact Lines
+name: Inspect Game DevMenu Triggers
 on:
   workflow_dispatch:
 jobs:
-  inspect-exact:
+  inspect-game-dv:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
           repository: "WamWooWam/RSDKv5-Decompilation"
           ref: "ios"
+          submodules: recursive
 
-      - name: Print SDL2InputDevice.cpp lines 1 to 130
+      - name: Print All DevMenu Triggers in Game/ and RSDKv5/
         run: |
-          nl -ba RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp | sed -n '1,130p'
+          echo "=== 1. DevMenu in Game/ ==="
+          grep -rn -C 5 -i "DEVMENU" Game/ || true
+          echo "=== 2. OpenDevMenu in RSDKv5/ ==="
+          grep -rn -C 5 "OpenDevMenu" RSDKv5/ || true
