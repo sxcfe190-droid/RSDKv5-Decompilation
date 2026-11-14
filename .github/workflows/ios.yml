@@ -47,17 +47,22 @@ jobs:
               s = f.read()
           s, n1 = re.subn(
               r"int32\s+buttonMap\[\]\s*=\s*\{[^;]+\};",
-              "int32 buttonMap[] = { SDL_CONTROLLER_BUTTON_DPAD_UP, SDL_CONTROLLER_BUTTON_DPAD_DOWN, SDL_CONTROLLER_BUTTON_DPAD_LEFT, SDL_CONTROLLER_BUTTON_DPAD_RIGHT, SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_START, SDL_CONTROLLER_BUTTON_BACK, SDL_CONTROLLER_BUTTON_MISC1, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID };",
+              "int32 buttonMap[] = { SDL_CONTROLLER_BUTTON_DPAD_UP, SDL_CONTROLLER_BUTTON_DPAD_DOWN, SDL_CONTROLLER_BUTTON_DPAD_LEFT, SDL_CONTROLLER_BUTTON_DPAD_RIGHT, SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_START, SDL_CONTROLLER_BUTTON_BACK, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID, SDL_CONTROLLER_BUTTON_INVALID };",
               s,
               count=1
           )
           s, n2 = re.subn(
               r"int32\s+keyMasks\[\]\s*=\s*\{[^;]+\};",
-              "int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT, KEYMASK_RIGHT, KEYMASK_A, KEYMASK_B, KEYMASK_C, KEYMASK_X, KEYMASK_Y, KEYMASK_Z, KEYMASK_START, KEYMASK_SELECT, KEYMASK_SELECT, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };",
+              "int32 keyMasks[] = { KEYMASK_UP, KEYMASK_DOWN, KEYMASK_LEFT, KEYMASK_RIGHT, KEYMASK_A, KEYMASK_B, KEYMASK_C, KEYMASK_X, KEYMASK_Y, KEYMASK_Z, KEYMASK_START, KEYMASK_SELECT, KEYMASK_STICKL, KEYMASK_STICKR, KEYMASK_BUMPERL, KEYMASK_BUMPERR };",
               s,
               count=1
           )
           assert n1 == 1 and n2 == 1, f"Failed to patch buttonMap/keyMasks: n1={n1}, n2={n2}"
+          # B 버튼(KEYMASK_B)이 눌렸을 때 SELECT(DV) 신호가 동시에 들어가는 현상 원천 차단
+          s = s.replace(
+              "int32 changedButtons = ~this->prevButtonMasks & (this->prevButtonMasks ^ this->buttonMasks);",
+              "if (this->buttonMasks & KEYMASK_B) { this->buttonMasks &= ~KEYMASK_SELECT; }\n    int32 changedButtons = ~this->prevButtonMasks & (this->prevButtonMasks ^ this->buttonMasks);"
+          )
           s = s.replace("device->swapABXY = true;", "device->swapABXY = false;")
           with open("RSDKv5/RSDK/Input/SDL2/SDL2InputDevice.cpp", "w", encoding="utf-8") as f:
               f.write(s)
