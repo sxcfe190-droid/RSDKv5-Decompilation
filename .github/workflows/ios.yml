@@ -11,6 +11,7 @@ jobs:
           repository: WamWooWam/RSDKv5-Decompilation
           ref: ios
           submodules: recursive
+# --- END 1 ---
       - name: Patch engine and audio/input
         run: |
           PBX="dependencies/ios/SDL/Xcode/SDL"
@@ -144,6 +145,7 @@ jobs:
                   open(fp, "w", encoding="utf-8", errors="ignore").write(s)
           EOF
           python3 patch.py
+          # --- END 2 ---
           cat << 'EOF' > RSDKv5/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
@@ -191,6 +193,7 @@ jobs:
             CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             CONFIGURATION_BUILD_DIR="$PWD/build_out"
+          # --- END 3 ---
           mkdir -p SaveEditorMod/Objects
           cat << 'EOF' > SaveEditorMod/Objects/Misc.h
           #ifndef OBJ_MISC_H
@@ -337,6 +340,7 @@ jobs:
               return false;
           }
           EOF
+          # --- END 4 ---
           cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.h
           #ifndef OBJ_UISAVESLOT_H
           #define OBJ_UISAVESLOT_H
@@ -366,7 +370,7 @@ jobs:
           #endif
           EOF
 
-          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot.c
+          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot_p1.c
           #include "UISaveSlot.h"
           ObjectUISaveSlot *UISaveSlot;
           bool32 editingSave = false; int32 editSlot = 0;
@@ -453,7 +457,9 @@ jobs:
               }
               out[digits] = 0;
           }
-          EOF          cat << 'EOF' >> SaveEditorMod/Objects/UISaveSlot.c
+          EOF
+          # --- END 5 ---
+          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot_p2.c
           void SaveEditor_OnDraw(void *data) {
               (void)data;
               if (!editingSave) return;
@@ -529,7 +535,8 @@ jobs:
               }
           }
           EOF
-          cat << 'EOF' >> SaveEditorMod/Objects/UISaveSlot.c
+          # --- END 6 ---
+          cat << 'EOF' > SaveEditorMod/Objects/UISaveSlot_p3.c
           bool32 UISaveSlot_State_Selected_Hook(bool32 skipped) {
               (void)skipped;
               RSDK_THIS(UISaveSlot);
@@ -678,6 +685,12 @@ jobs:
               return false;
           }
           EOF
+          # --- END 7 ---
+          cat SaveEditorMod/Objects/UISaveSlot_p1.c \
+              SaveEditorMod/Objects/UISaveSlot_p2.c \
+              SaveEditorMod/Objects/UISaveSlot_p3.c \
+              > SaveEditorMod/Objects/UISaveSlot.c
+
           python3 -c '
           lb, rb = chr(91), chr(93)
           gp = "SaveEditorMod/Objects/GameProgress.h"
@@ -752,6 +765,7 @@ jobs:
           }
           #endif
           EOF
+          # --- END 8 ---
           GH="github.com"
           GAPI_REPO="RSDKModding/RSDKv5-GameAPI"
           git clone --depth 1 "https://${GH}/${GAPI_REPO}.git" GameAPI_SDK
@@ -804,4 +818,4 @@ jobs:
         with:
           name: RSDKv5-iOS-IPA
           path: RSDKv5-iOS.ipa
-
+# --- END 9 ---
